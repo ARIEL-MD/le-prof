@@ -4104,56 +4104,6 @@ PRINCIPES Son action repose sur :
   return undefined;
 }
 
-/** Recherche sémantique locale multi-pistes : requête complète + noyau lexical + paires de termes, puis classement des candidats. */
-function inferSemanticDiscipline(query: string): DisciplineType | undefined {
-  const q = normalizeString(query);
-  if (/\b(francais|français|litterature|poesie|poeme|roman|theatre|figure|stylistique|mouvement|annales|expression ecrite|dissertation litteraire)\b/i.test(q)) return 'francais';
-  if (/\b(guerre|colonisation|decolonisation|onu|nations unies|independance|independance|revolution|bipolarisation|guerre froide|histoire|dates historiques|seconde guerre|premiere guerre|ceDEAO|union africaine|burkina)\b/i.test(q)) return 'histoire';
-  if (/\b(geographie|agriculture|population|climat|relief|industrie|commerce|economie|territoire|urbanisation|mondialisation)\b/i.test(q)) return 'geographie';
-  if (/\b(math|mathematique|equation|fonction|derivee|integrale|probabilite|geometrie|pythagore|thales|trigonometrie)\b/i.test(q)) return 'mathematiques';
-  if (/\b(physique|chimie|newton|force|vitesse|energie|oxydation|reaction chimique|dosage|acide|base)\b/i.test(q)) return 'physique_chimie';
-  if (/\b(svt|biologie|cellule|genetique|adn|mitose|meiose|immunologie|anatomie|ecosysteme)\b/i.test(q)) return 'svt';
-  if (/\b(anglais|english)\b/i.test(q)) return 'anglais';
-  if (/\b(allemand|deutsch)\b/i.test(q)) return 'allemand';
-  if (/\b(espagnol|espanol|castillan)\b/i.test(q)) return 'espagnol';
-  if (/\b(philosophie|philosophique|liberte|conscience|inconscient|autrui|bonheur|desir|verite|justice|droit|morale|raison|religion|art|travail|langage|societe|etat|violence)\b/i.test(q)) return 'philo';
-  return undefined;
-}
-function buildSemanticSearchVariants(rawQuery: string): string[] {
-  const normalized = normalizeString(rawQuery).trim();
-  const stopWords = new Set(['donne','donner','donnez','moi','svp','stp','merci','cherche','recherche','trouve','trouver','explique','expliquer','parle','parler','cours','fiche','notion','definition','definir','signification','argument','arguments','citation','citations','exemple','exemples','present','présent','conjugaison','conjuguer','temps','mode','forme','formes','sur','pour','avec','dans','de','du','des','la','le','les','un','une','au','aux','en','et','ou','ce','cette','ces','qui','est','sont','que','quoi','comment','pourquoi','peut','peuvent','faut','doit','doivent','est-il','est-ce','a','à','d','l']);
-  const tokens = normalized.split(/\s+/).filter(t => t.length >= 3 && !stopWords.has(t));
-  const variants: string[] = [rawQuery.trim()];
-  if (tokens.length) variants.push(tokens.join(' '));
-  for (let i = 0; i < tokens.length - 1; i++) variants.push(tokens[i] + ' ' + tokens[i + 1]);
-  if (tokens.length > 3) variants.push(tokens.slice(0, 3).join(' '));
-  return [...new Set(variants.filter(Boolean))].slice(0, 8);
-}
-
-function semanticCandidateScore(result: CourseSearchResult, rawQuery: string): number {
-  if (!result || result.noResult) return -Infinity;
-  const norm = (v: string) => normalizeString(v);
-  const q = norm(rawQuery);
-  const qTokens = q.split(/\s+/).filter(t => t.length >= 3);
-  const title = norm(result.chapterTitle || '');
-  const body = norm([result.chapterTitle || '', result.definitionAndScope || '', result.directContent || '', result.quickRevisionMemo || '', ...(result.coreConceptsAndFormulas || []).slice(0, 30).flatMap(c => [c.name || '', c.formulaOrRule || '', c.explanation || '', c.contextOrApplication || ''])].join(' '));
-  const bodyTokens = new Set(body.split(/\s+/));
-  let score = q.length >= 5 && title.includes(q) ? 100 : 0;
-  for (const token of qTokens) { if (new Set(title.split(/\s+/)).has(token)) score += 12; else if (bodyTokens.has(token)) score += 7; else if (body.includes(token)) score += 2; }
-  if (result.isDirectAnswer) score += 8;
-  return score;
-}
-
-async function searchLocalSemanticFallback(rawQuery: string, level?: SecondaryLevel, discipline?: DisciplineType, serie?: AcademicSerie): Promise<CourseSearchResult | null> {
-  const candidates: CourseSearchResult[] = [];
-  for (const variant of buildSemanticSearchVariants(rawQuery)) {
-    try { const result = getAcademicCourseResult(variant, level, discipline, serie); if (result && !result.noResult) candidates.push(result); } catch { /* une source défaillante ne bloque pas les autres */ }
-  }
-  if (!candidates.length) return null;
-  const unique = [...new Map(candidates.map(r => [r.chapterTitle + '|' + r.discipline, r])).values()];
-  unique.sort((a, b) => semanticCandidateScore(b, rawQuery) - semanticCandidateScore(a, rawQuery));
-  return unique[0] || null;
-}
 async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams): Promise<CourseSearchResult> {
   const rawQuery = (params.query || "").trim();
   const cleanQuery = normalizeString(rawQuery);
@@ -4677,8 +4627,6 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
   const has = (text: string, token: string) => new RegExp('\\b' + escaped(token) + '\\b', 'i').test(text);
   let titleHits = 0, bodyHits = 0;
   for (const token of coreTokens) { if (has(title, token)) titleHits++; if (has(body, token)) bodyHits++; }
-  const distinctiveTokens = coreTokens.filter(t => t.length >= 5 || /^\\d+$/.test(t));
-  if (distinctiveTokens.some(token => !has(title, token) && !has(body, token))) return false;
   if (exactOnlyTokens.some(token => !has(title, token))) return false;
   if (coreTokens.every(token => has(title, token))) return true;
   if (coreTokens.length === 1) return titleHits >= 1;
@@ -4690,25 +4638,6 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
 export async function searchAcademicCourseUnified(params: AcademicSearchParams): Promise<CourseSearchResult> {
   const result = await searchAcademicCourseUnifiedInternal(params);
   if (isSearchResultRelevant(result, params.query || '')) return result;
-
-  // Dernier niveau : recherche sémantique seulement après épuisement/rejet
-  // des sources spécialisées, afin de ne jamais voler un résultat officiel.
-  if (result.noResult) {
-    const rawQuery = (params.query || '').trim();
-    const hasSuspiciousIdentifier = /\b\d{6,}\b/.test(normalizeString(rawQuery));
-    if (!hasSuspiciousIdentifier) {
-      const semanticDiscipline = params.discipline || inferSemanticDiscipline(rawQuery);
-      const semanticFallback = await searchLocalSemanticFallback(rawQuery, params.level, semanticDiscipline, params.serie);
-      const semanticTokens = buildSemanticSearchVariants(rawQuery)[1]?.split(/\s+/).filter(t => t.length >= 3) || [];
-      const semanticTitle = normalizeString(semanticFallback?.chapterTitle || '');
-      const semanticStrongMatch = semanticFallback && semanticTokens.length >= 2 && semanticTokens.filter(t => semanticTitle.includes(t)).length >= 2;
-      if (semanticStrongMatch && semanticCandidateScore(semanticFallback!, rawQuery) >= 12 && isSearchResultRelevant(semanticFallback, rawQuery)) {
-        saveToCache(`${normalizeString(rawQuery)}_semantic`, semanticFallback);
-        return semanticFallback;
-      }
-    }
-  }
-
   return {
     query: (params.query || '').trim(),
     discipline: params.discipline || 'philo',
