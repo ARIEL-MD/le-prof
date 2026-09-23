@@ -37,11 +37,11 @@ test("pipeline complet : le sujet exact reste la source de vérité", () => {
     const result = solved.result!;
     const analysis = solved.methodologyAnalysis!;
     const redaction = solved.structuredRedaction!;
-    const exact = norm(subject).replace(/\\?$/,"");
+    const exact = norm(subject).replace(/\?$/,"");
 
-    assert.equal(norm(result.problemStatement).replace(/\\?$/,""), exact, `problème détourné: ${subject}`);
-    assert.ok(norm(analysis.philoPreliminaryWork.problematisation.probleme).includes(exact.replace(/\\?$/,"")), `problématisation détournée: ${subject}`);
-    assert.ok(norm(analysis.philoPreliminaryWork.level5FullRedaction).includes(exact.replace(/\\?$/,"")), `rédaction sans sujet exact: ${subject}`);
+    assert.equal(norm(result.problemStatement).replace(/\?$/,""), exact, `problème détourné: ${subject}`);
+    assert.ok(norm(analysis.philoPreliminaryWork.problematisation.probleme).includes(exact.replace(/\?$/,"")), `problématisation détournée: ${subject}`);
+    assert.ok(norm(analysis.level5FullRedaction).includes(exact.replace(/\?$/,"")), `rédaction sans sujet exact: ${subject}`);
 
     const conclusion = norm(redaction.conclusion.fullText);
     for (const w of significantWords(subject).slice(0, 4)) {
@@ -49,7 +49,7 @@ test("pipeline complet : le sujet exact reste la source de vérité", () => {
     }
 
     const full = norm(analysis.level5FullRedaction);
-    assert.ok(full.includes(norm(subject).replace(/\\?$/,"")), `sujet exact absent de la copie finale: ${subject}`);
+    assert.ok(full.includes(norm(subject).replace(/\?$/,"")), `sujet exact absent de la copie finale: ${subject}`);
   }
 });
 
