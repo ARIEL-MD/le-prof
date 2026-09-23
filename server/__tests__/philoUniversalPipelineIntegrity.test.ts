@@ -21,15 +21,14 @@ const subjects = [
 ];
 
 function norm(s: string) {
-  return s.toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[’']/g, "'").replace(/\\s+/g, " ").trim();
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, "'").replace(/\s+/g, " ").trim();
 }
 
 function significantWords(subject: string) {
-  return norm(subject).replace(/[^a-z0-9\\s]/g, " ").split(/\\s+/)
+  return norm(subject).replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
     .filter(w => w.length >= 5)
     .filter(w => !new Set(["quelle","quelles","quels","comment","pourquoi","mesure","homme","hommes","peut","peut-on","faut","faut-il","doit","doit-on","dans","sans","pour","avec","est","sont"]).has(w));
 }
-
 test("pipeline complet : le sujet exact reste la source de vérité", () => {
   for (const subject of subjects) {
     const solved = solvePhiloTle(subject);
