@@ -2091,6 +2091,74 @@ export function extractCleanSearchTopic(rawQuery: string): { topic: string; inte
 }
 
 /**
+ * Recherche une section Wikipédia correspondant à l'intention demandée.
+ * Cela permet de traiter des requêtes inédites comme « causes de X »,
+ * « acteurs de X », « conséquences de X », etc., sans liste prédéfinie de sujets.
+ */
+async function searchWikipediaTargetedSection(
+  pageTitle: string,
+  intent: string
+): Promise<{ heading: string; content: string } | null> {
+  const headingPatterns: Record<string, RegExp[]> = {
+    CAUSES: [/cause|origine|genese|déclenche|contexte|prélude/i],
+    CONSEQUENCES: [/conséquence|bilan|impact|effet|résultat|issue/i],
+    ACTORS: [/acteur|belligérant|participant|personnage|protagoniste|forces en présence/i],
+    DATES: [/chronologie|date|calendrier|chronologique|période|déroulement|histoire/i],
+    CHARACTERISTICS: [/caractéristique|particularité|propriété|traits?/i],
+    ROLE: [/rôle|importance|fonction|influence|portée/i],
+    OBJECTIVES: [/objectif|but|mission|finalité|visée/i],
+    PRINCIPLES: [/principe|fondement|base|règle/i],
+    LIMITS: [/limite|critique|faiblesse|inconvénient|désavantage/i],
+    ADVANTAGES: [/avantage|atout|bénéfice|intérêt/i],
+    STAGES: [/étape|phase|évolution|déroulement|développement/i],
+    MECHANISM: [/mécanisme|fonctionnement|processus|comment/i],
+    EXAMPLES: [/exemple|cas|application|illustration/i],
+    DEFINITION: [/définition|description|présentation|nature/i],
+  };
+  const patterns = headingPatterns[intent];
+  if (!patterns) return null;
+
+  try {
+    const sectionsUrl = `https://fr.wikipedia.org/w/api.php?action=query&prop=sections&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2`;
+    const sectionsRes = await fetch(sectionsUrl, {
+      headers: { "User-Agent": "LeProfEducationBot/1.0 (contact@leprof.ci)" },
+      signal: AbortSignal.timeout(3000)
+    });
+    if (!sectionsRes.ok) return null;
+    const sectionsData: any = await sectionsRes.json();
+    const sections = sectionsData?.query?.pages?.[0]?.sections || [];
+
+    // Chercher d'abord un titre fortement explicite, puis un titre plus général.
+    const ranked = sections
+      .map((section: any) => {
+        const title = String(section?.line || "");
+        const depth = Number(section?.toclevel || 9);
+        const match = patterns.some(pattern => pattern.test(title));
+        return { section, title, depth, match };
+      })
+      .filter((item: any) => item.match)
+      .sort((a: any, b: any) => a.depth - b.depth);
+
+    const selected = ranked[0];
+    if (!selected?.section?.index) return null;
+
+    const extractUrl = `https://fr.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2&explaintext=1&exsectionformat=plain&section=${encodeURIComponent(String(selected.section.index))}`;
+    const extractRes = await fetch(extractUrl, {
+      headers: { "User-Agent": "LeProfEducationBot/1.0 (contact@leprof.ci)" },
+      signal: AbortSignal.timeout(3000)
+    });
+    if (!extractRes.ok) return null;
+    const extractData: any = await extractRes.json();
+    const content = String(extractData?.query?.pages?.[0]?.extract || "").trim();
+
+    if (content.length < 80) return null;
+    return { heading: selected.title, content };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Recherche encyclopédique libre et gratuite (Vikidia & Wikipédia)
  * Permet de répondre à TOUT sujet ou notion non répertorié dans les programmes locaux,
  * 100% sans IA, sans quota et sans clé API.
@@ -2132,6 +2200,11 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
     const extract = summaryData.extract;
     const description = summaryData.description || "Notion académique et encyclopédique";
 
+    // Si l'utilisateur demande une facette précise, chercher la section correspondante
+    // dans l'article plutôt que de retourner uniquement son résumé général.
+    const targetedSection = await searchWikipediaTargetedSection(title, intent);
+    const targetedText = targetedSection?.content || "";
+
     // Découper les phrases pour isoler les concepts clés
     const sentences = extract.split(/(?<=[.!?])\s+/).filter((s: string) => s.length > 20);
 
@@ -2139,18 +2212,24 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
     const isCitationIntent = intent === "CITATION";
     const isAuthorIntent = intent === "AUTHOR";
 
+    const effectiveExtract = targetedText || extract;
+    const effectiveSentences = effectiveExtract.split(/(?<=[.!?])\\s+/).filter((s: string) => s.length > 20);
     const concepts: CourseConceptFormula[] = [
       {
-        name: isAuthorIntent
+        name: targetedSection
+          ? `${targetedSection.heading} : ${title}`
+          : isAuthorIntent
           ? `Identité & Profil Académique : ${title}`
           : isArgumentIntent 
           ? `Thèse Fondamentale : ${title}` 
           : isCitationIntent 
           ? `Pensée & Doctrine de Référence : ${title}`
           : `Définition Fondamentale : ${title}`,
-        formulaOrRule: sentences[0] || extract,
+        formulaOrRule: effectiveSentences[0] || effectiveExtract,
         explanation: description,
-        contextOrApplication: isAuthorIntent
+        contextOrApplication: targetedSection
+          ? `Réponse ciblée sur l'intention « ${intent.toLowerCase()} » à partir de la section correspondante de l'article encyclopédique.`
+          : isAuthorIntent
           ? `Présentation biographique, cadre historique et rôle intellectuel majeur.`
           : isArgumentIntent
           ? `À poser en première partie ou en amorce pour cadrer la démonstration.`
@@ -2158,14 +2237,14 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
       }
     ];
 
-    if (sentences.length > 1) {
+    if (effectiveSentences.length > 1) {
       concepts.push({
         name: isAuthorIntent
           ? `Œuvres Clés & Idées Directrices : ${title}`
           : isArgumentIntent 
           ? `Argument d'Appui & Mécanismes : ${title}`
           : `Propriétés & Principes Essentiels`,
-        formulaOrRule: sentences.slice(1, 3).join(" "),
+        formulaOrRule: effectiveSentences.slice(1, 3).join(" "),
         explanation: `Caractéristiques majeures, thèses et contributions déterminantes associées à ${title}.`,
         contextOrApplication: isAuthorIntent
           ? `À mobiliser dans les dissertations et explications de texte comme référence d'autorité.`
@@ -2175,14 +2254,14 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
       });
     }
 
-    if (sentences.length > 3) {
+    if (effectiveSentences.length > 3) {
       concepts.push({
         name: isAuthorIntent
           ? `Héritage Philosophique & Portée : ${title}`
           : isArgumentIntent 
           ? `Nuance Critique & Dépassement Dialectique`
           : `Contexte & Développements Historiques ou Scientifiques`,
-        formulaOrRule: sentences.slice(3, 5).join(" "),
+        formulaOrRule: effectiveSentences.slice(3, 5).join(" "),
         explanation: isAuthorIntent
           ? `Influence durable de ${title} sur la pensée contemporaine et la postérité.`
           : isArgumentIntent
@@ -2230,7 +2309,7 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
       level: "terminale",
       levelLabel: "Collège, Lycée & Supérieur",
       chapterTitle: `${title} : ${chapterPrefix}`,
-      definitionAndScope: `${extract}\n\nCette synthèse académique rassemble les savoirs fondamentaux, repères méthodologiques et analyses validés par les standards éducatifs.`,
+      definitionAndScope: `${targetedSection ? targetedSection.heading + "\n" : ""}${effectiveExtract}\n\nCette synthèse académique rassemble les savoirs fondamentaux, repères méthodologiques et analyses validés par les standards éducatifs.`,
       coreConceptsAndFormulas: concepts,
       stepByStepMethod: [
         {
