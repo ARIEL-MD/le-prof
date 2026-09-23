@@ -1,0 +1,21 @@
+[
+  {
+    "id": "usr_1790024034697_28d98c4c",
+    "email": "test@etudiant.ci",
+    "passwordHash": "b7813ad070ac162312245881e4f3d118828126f93f9468c6fc1ad31443c64b05eaee6f89b9df05c8cc0977dcfc4bf49507cf1294036b254385714c8d6b036a44",
+    "salt": "dfea46f909eca4de1acd23aa06cbfc95",
+    "firstName": "Ariel",
+    "lastName": "KOUAME",
+    "fullName": "KOUAME Ariel",
+    "country": "Cote d Ivoire",
+    "countryCode": "CI",
+    "flagEmoji": "🇨🇮",
+    "phoneCode": "+225",
+    "educationSystem": "Système Francophone",
+    "curriculumAuthority": "Programme Officiel",
+    "grade": "Terminale",
+    "serie": "Terminale D",
+    "createdAt": "2026-09-21T20:53:54.697Z",
+    "updatedAt": "2026-09-21T20:53:54.697Z"
+  }
+]

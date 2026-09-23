@@ -1,0 +1,8 @@
+{
+  "name": "Le Prof — Examens & Concours (BEPC & BAC) v10",
+  "description": "Plateforme éducative d'excellence mondiale de la 6e à la Terminale, CPGE & Supérieur couvrant toutes les matières (Maths, PC, SVT, Philosophie, Histoire-Géo, Français, Langues, SES, Informatique) et tous les programmes internationaux (Baccalauréats francophones, IB DP, AP, A-Levels, Brevet) selon la Méthode Papa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
