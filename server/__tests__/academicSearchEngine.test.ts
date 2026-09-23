@@ -188,7 +188,7 @@ describe("Recherche de Cours & Notions — anti faux positifs", () => {
 
   it("ne retourne pas une fiche arbitraire pour une notion inconnue", async () => {
     const res = await searchAcademicCourseUnified({ query: "notion totalement inexistante xyzqv 847291" });
-    console.log('DIAG_UNKNOWN', res.chapterTitle, res.discipline, res.query);\n    assert.equal(res.noResult, true);
+    assert.equal(res.noResult, true);
     assert.match(res.chapterTitle, /aucun résultat pertinent/i);
   });
   it("répond exactement à une demande de conjugaison ciblée et conserve le verbe demandé", async () => {
