@@ -4635,7 +4635,7 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
   const semanticFallback = hasSuspiciousIdentifier ? null : await searchLocalSemanticFallback(rawQuery, params.level, semanticDiscipline, params.serie);
   const semanticTokens = buildSemanticSearchVariants(rawQuery)[1]?.split(/\s+/).filter(t => t.length >= 3) || [];
   const semanticTitle = normalizeString(semanticFallback?.chapterTitle || '');
-  const semanticStrongMatch = semanticFallback && semanticTokens.length >= 2 && semanticTokens.filter(t => semanticTitle.includes(t)).length >= 1;
+  const semanticStrongMatch = semanticFallback && semanticTokens.length >= 2 && semanticTokens.filter(t => semanticTitle.includes(t)).length >= 2;
   if (semanticStrongMatch && semanticCandidateScore(semanticFallback!, rawQuery) >= 12 && isSearchResultRelevant(semanticFallback!, rawQuery)) {
     saveToCache(cacheKey, semanticFallback);
     return semanticFallback;
