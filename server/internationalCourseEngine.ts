@@ -1,13 +1,10 @@
 /**
  * Moteur universel de recherche éducative.
  *
- * Ce module ne définit pas une liste fermée de recherches possibles.
- * Il sert de filet de sécurité pour toute requête qui n'a pas été résolue
- * par les bases pédagogiques spécialisées de Le Prof.
- *
- * Principe : requête libre -> extraction du sujet -> recherche multi-source ->
- * classement des candidats -> extraction de la partie de l'article la plus
- * proche de la demande -> réponse pédagogique.
+ * Important : ce moteur n'utilise pas une liste fermée de « types de recherches ».
+ * Il travaille à partir de la requête libre elle-même : sujet, relations entre
+ * termes, contexte et formulation. Les recherches spécialisées de Le Prof restent
+ * prioritaires ; ce module sert de moteur général lorsque ces bases ne suffisent pas.
  */
 
 import { CourseSearchResult, CourseConceptFormula } from '../src/types';
@@ -18,7 +15,6 @@ function cleanQuery(str: string): string {
 }
 
 export function isInternationalQuery(_query: string): boolean {
-  // Conservé pour compatibilité avec les appelants existants.
   return true;
 }
 
@@ -32,119 +28,208 @@ function normalize(value: string): string {
     .trim();
 }
 
-// Mots grammaticaux très fréquents : ils ne doivent pas décider du sujet.
-// Ce n'est PAS une liste de types de recherche : elle sert uniquement à retirer
-// le bruit linguistique avant le classement des résultats.
+// Bruit grammatical uniquement. Ce tableau ne décrit PAS les types de recherche.
 const STOP_WORDS = new Set([
   'a','au','aux','avec','ce','ceci','cela','ces','cette','dans','de','des','du','en','et','est','etait','etre',
   'il','ils','je','la','le','les','leur','leurs','ma','mais','me','mes','mon','ne','nos','notre','nous','on','ou',
   'par','pas','pour','que','quel','quelle','quelles','quels','qui','quoi','sa','se','ses','son','sur','ta','te','tes',
   'toi','ton','tous','tout','un','une','vos','votre','vous','y','d','l',
   'donne','donner','donnez','moi','cherche','chercher','recherche','recherches','trouve','trouver','explique','expliquer',
-  'parle','parler','montre','montrer','faire','fais','fait','faire-moi','svp','stp','please'
+  'parle','parler','montre','montrer','faire','fais','fait','svp','stp','please','peux','peut','pouvez','comment','pourquoi',
+  'est-ce','estce','qu','quoi','quelque','faire-moi','fais-moi'
+]);
+
+const GENERIC_REQUEST_WORDS = new Set([
+  'argument','arguments','citation','citations','exemple','exemples','definition','definir','resume','synthese','analyse',
+  'cours','notion','notions','fiche','revision','information','informations','question','questions','reponse','reponses',
+  'explication','explications','detail','details','principal','principaux','principale','principales','donner','donnez',
+  'montre','montrer','explique','expliquer','calcul','calculer','solution','solutions','methode','methodes','conjugaison',
+  'conjugue','conjuguer','traduction','traduire','compare','comparer','comparaison','difference','differences'
 ]);
 
 function tokens(value: string): string[] {
   return normalize(value).split(/\s+/).filter(t => t.length >= 2 && !STOP_WORDS.has(t));
 }
 
-function subjectQuery(query: string): string {
-  const result = tokens(query);
-  return result.join(' ').trim() || normalize(query);
-}
-
-function rankHit(title: string, snippet: string, query: string, subject: string, index: number): number {
-  const t = normalize(title);
-  const s = normalize(snippet);
-  const q = tokens(query);
-  const st = tokens(subject);
-  let score = 0;
-
-  if (t === normalize(subject)) score += 150;
-  if (t === normalize(query)) score += 120;
-
-  for (const token of st) {
-    if (t.includes(token)) score += 35;
-    else if (s.includes(token)) score += 8;
-  }
-  for (const token of q) {
-    if (t.includes(token)) score += 10;
-    else if (s.includes(token)) score += 2;
-  }
-
-  if (t.includes('(homonymie)') || t.includes('(disambiguation)')) score -= 100;
-  return score - index * 0.25;
-}
-
-async function searchWikipediaCandidate(query: string, lang: 'fr' | 'en') {
-  const subject = subjectQuery(query);
-  const searches = Array.from(new Set([query, subject])).filter(Boolean);
-  const candidates: Array<{ title: string; score: number; lang: 'fr' | 'en' }> = [];
-
-  for (const search of searches) {
-    const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(search)}&srlimit=10&srprop=snippet&format=json&origin=*`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(5000) });
-    if (!res.ok) continue;
-    const data: any = await res.json();
-    const hits = Array.isArray(data?.query?.search) ? data.query.search : [];
-    hits.forEach((hit: any, index: number) => {
-      const title = String(hit?.title || '');
-      if (!title) return;
-      candidates.push({ title, score: rankHit(title, String(hit?.snippet || ''), query, subject, index), lang });
-    });
-  }
-
-  candidates.sort((a, b) => b.score - a.score);
-  const best = candidates[0];
-  if (!best || best.score < 20) return null;
-
-  const summaryUrl = `https://${best.lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(best.title)}`;
-  const summaryRes = await fetch(summaryUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(5000) });
-  if (!summaryRes.ok) return null;
-  const summary: any = await summaryRes.json();
-  if (!summary?.extract || summary.type === 'disambiguation') return null;
-
-  return { title: String(summary.title || best.title), extract: String(summary.extract), description: String(summary.description || ''), url: String(summary.content_urls?.desktop?.page || ''), lang: best.lang, score: best.score };
+function meaningfulTokens(value: string): string[] {
+  return tokens(value).filter(t => !GENERIC_REQUEST_WORDS.has(t));
 }
 
 /**
- * Cherche automatiquement une section pertinente sans connaître à l'avance
- * le type de question. Les mots de la requête sont comparés aux titres des
- * sections de l'article retenu. Ainsi une formulation nouvelle peut fonctionner
- * sans être ajoutée à un dictionnaire « causes/conséquences/... ».
+ * Construit plusieurs formulations de recherche sans supposer une intention précise.
+ * On conserve toujours la requête complète : aucune information demandée n'est jetée.
  */
-async function findBestSection(pageTitle: string, lang: 'fr' | 'en', query: string): Promise<{ heading: string; content: string } | null> {
+function buildSearchVariants(query: string): string[] {
+  const q = cleanQuery(query);
+  const raw = tokens(q);
+  const meaningful = meaningfulTokens(q);
+  const variants = new Set<string>();
+  variants.add(q);
+  if (meaningful.length) variants.add(meaningful.join(' '));
+  if (raw.length >= 3) {
+    variants.add(raw.slice(0, Math.min(raw.length, 8)).join(' '));
+    variants.add(raw.slice(Math.max(0, raw.length - 8)).join(' '));
+  }
+  // Préserve les groupes de 2-4 mots consécutifs : utile pour les noms propres,
+  // concepts et expressions que le moteur ne doit pas casser.
+  for (let n = Math.min(4, raw.length); n >= 2; n--) {
+    for (let i = 0; i + n <= raw.length; i++) {
+      const phrase = raw.slice(i, i + n).join(' ');
+      if (phrase.length >= 8) variants.add(phrase);
+    }
+    if (variants.size >= 10) break;
+  }
+  return Array.from(variants).slice(0, 12);
+}
+
+function overlapScore(queryTokens: string[], text: string): number {
+  const normalized = normalize(text);
+  if (!normalized) return 0;
+  let score = 0;
+  const unique = Array.from(new Set(queryTokens));
+  for (const token of unique) {
+    if (normalized.includes(token)) {
+      score += token.length >= 7 ? 5 : token.length >= 5 ? 3 : 1.5;
+    }
+  }
+  return score;
+}
+
+function rankHit(title: string, snippet: string, query: string, index: number, searchVariant: string): number {
+  const t = normalize(title);
+  const s = normalize(snippet);
+  const qTokens = meaningfulTokens(query);
+  const variantTokens = meaningfulTokens(searchVariant);
+  const exactQuery = normalize(query);
+  const exactVariant = normalize(searchVariant);
+  let score = 0;
+
+  if (t === exactQuery) score += 160;
+  if (t === exactVariant) score += 110;
+  if (t.includes(exactVariant) && exactVariant.length >= 8) score += 55;
+
+  score += overlapScore(qTokens, t) * 9;
+  score += overlapScore(qTokens, s) * 3;
+  score += overlapScore(variantTokens, t) * 7;
+  score += overlapScore(variantTokens, s) * 2;
+
+  if (t.includes('(homonymie)') || t.includes('(disambiguation)')) score -= 150;
+  if (/\b(liste|liste de|index|portail|homonymie|disambiguation)\b/i.test(t)) score -= 35;
+  return score - index * 0.2;
+}
+
+async function searchWikipediaCandidates(query: string, lang: 'fr' | 'en') {
+  const variants = buildSearchVariants(query);
+  const candidates = new Map<string, { title: string; snippet: string; score: number; lang: 'fr' | 'en' }>();
+
+  for (const variant of variants) {
+    try {
+      const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(variant)}&srlimit=12&srprop=snippet&format=json&origin=*`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'LeProfAcademicEngine/4.0' }, signal: AbortSignal.timeout(4500) });
+      if (!res.ok) continue;
+      const data: any = await res.json();
+      const hits = Array.isArray(data?.query?.search) ? data.query.search : [];
+      hits.forEach((hit: any, index: number) => {
+        const title = String(hit?.title || '').trim();
+        if (!title) return;
+        const snippet = String(hit?.snippet || '').replace(/<[^>]+>/g, ' ');
+        const score = rankHit(title, snippet, query, index, variant);
+        const previous = candidates.get(normalize(title));
+        if (!previous || score > previous.score) candidates.set(normalize(title), { title, snippet, score, lang });
+      });
+    } catch {
+      // Une source indisponible ne doit pas empêcher les autres variantes de répondre.
+    }
+  }
+
+  return Array.from(candidates.values()).sort((a, b) => b.score - a.score).slice(0, 12);
+}
+
+async function getWikipediaSummary(candidate: { title: string; score: number; lang: 'fr' | 'en' }) {
   try {
-    const sectionsUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=sections&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2`;
-    const sectionsRes = await fetch(sectionsUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(3500) });
-    if (!sectionsRes.ok) return null;
-    const data: any = await sectionsRes.json();
-    const sections = Array.isArray(data?.query?.pages?.[0]?.sections) ? data.query.pages[0].sections : [];
-    if (!sections.length) return null;
-
-    const pageTokens = new Set(tokens(pageTitle));
-    const requestTokens = tokens(query).filter(t => !pageTokens.has(t));
-    if (!requestTokens.length) return null;
-
-    const ranked = sections.map((section: any) => {
-      const heading = String(section?.line || '');
-      const headingTokens = tokens(heading);
-      const overlap = requestTokens.filter(t => headingTokens.includes(t) || normalize(heading).includes(t)).length;
-      return { section, heading, score: overlap * 30 - Number(section?.toclevel || 9) };
-    }).filter((x: any) => x.score > 0).sort((a: any, b: any) => b.score - a.score);
-
-    const best = ranked[0];
-    if (!best?.section?.index) return null;
-
-    const extractUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2&explaintext=1&section=${encodeURIComponent(String(best.section.index))}`;
-    const extractRes = await fetch(extractUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(3500) });
-    if (!extractRes.ok) return null;
-    const extractData: any = await extractRes.json();
-    const content = String(extractData?.query?.pages?.[0]?.extract || '').trim();
-    return content.length >= 80 ? { heading: best.heading, content } : null;
+    const summaryUrl = `https://${candidate.lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(candidate.title)}`;
+    const summaryRes = await fetch(summaryUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/4.0' }, signal: AbortSignal.timeout(4500) });
+    if (!summaryRes.ok) return null;
+    const summary: any = await summaryRes.json();
+    if (!summary?.extract || summary.type === 'disambiguation') return null;
+    return {
+      title: String(summary.title || candidate.title),
+      extract: String(summary.extract),
+      description: String(summary.description || ''),
+      url: String(summary.content_urls?.desktop?.page || ''),
+      lang: candidate.lang,
+      score: candidate.score
+    };
   } catch {
     return null;
   }
+}
+
+/**
+ * Recherche une section OU des passages pertinents sans connaître à l'avance
+ * la nature de la demande. Les paragraphes sont scorés avec la requête complète,
+ * ce qui permet par exemple « rôle de la pêche dans le développement économique
+ * de la Côte d'Ivoire » sans créer une règle spéciale pour cette phrase.
+ */
+async function findRelevantContent(pageTitle: string, lang: 'fr' | 'en', query: string): Promise<{ heading: string; content: string } | null> {
+  try {
+    const sectionsUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=sections&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2`;
+    const sectionsRes = await fetch(sectionsUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/4.0' }, signal: AbortSignal.timeout(3500) });
+    if (!sectionsRes.ok) return null;
+    const data: any = await sectionsRes.json();
+    const sections = Array.isArray(data?.query?.pages?.[0]?.sections) ? data.query.pages[0].sections : [];
+    const requestTokens = meaningfulTokens(query);
+
+    const rankedSections = sections.map((section: any) => {
+      const heading = String(section?.line || '');
+      return { section, heading, score: overlapScore(requestTokens, heading) };
+    }).filter((x: any) => x.score > 0).sort((a: any, b: any) => b.score - a.score);
+
+    const candidates = rankedSections.slice(0, 3);
+    for (const candidate of candidates) {
+      if (!candidate.section?.index) continue;
+      const extractUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2&explaintext=1&section=${encodeURIComponent(String(candidate.section.index))}`;
+      const extractRes = await fetch(extractUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/4.0' }, signal: AbortSignal.timeout(3500) });
+      if (!extractRes.ok) continue;
+      const extractData: any = await extractRes.json();
+      const content = String(extractData?.query?.pages?.[0]?.extract || '').trim();
+      if (content.length >= 80) return { heading: candidate.heading, content };
+    }
+
+    // Certaines pages n'ont pas de titres utiles. Dans ce cas, on récupère le texte
+    // complet et sélectionne les paragraphes les plus proches de la requête.
+    const fullUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2&explaintext=1&exsectionformat=plain`;
+    const fullRes = await fetch(fullUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/4.0' }, signal: AbortSignal.timeout(4500) });
+    if (!fullRes.ok) return null;
+    const fullData: any = await fullRes.json();
+    const fullText = String(fullData?.query?.pages?.[0]?.extract || '').trim();
+    if (!fullText) return null;
+
+    const paragraphs = fullText.split(/\n{1,2}/).map(p => p.trim()).filter(p => p.length >= 70);
+    const rankedParagraphs = paragraphs.map((paragraph, index) => ({
+      paragraph,
+      score: overlapScore(requestTokens, paragraph) + (index < 3 ? 1 : 0)
+    })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+    if (rankedParagraphs.length) {
+      return { heading: 'Informations directement pertinentes', content: rankedParagraphs.slice(0, 5).map(x => x.paragraph).join('\n\n') };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function inferDiscipline(query: string): { code: string; label: string } {
+  const q = normalize(query);
+  if (/\b(philosoph|liberte|conscience|inconscient|bonheur|justice|verite|morale|art|raison)\b/.test(q)) return { code: 'philo', label: 'Philosophie' };
+  if (/\b(equation|fonction|derivee|integrale|geometr|probabilite|statistique|matrice|arithmet|calcul)\b/.test(q)) return { code: 'maths', label: 'Mathématiques' };
+  if (/\b(physique|vitesse|force|energie|electricite|optique|mecanique|mouvement)\b/.test(q)) return { code: 'physique', label: 'Physique' };
+  if (/\b(chimie|atome|molecule|reaction|acide|base|oxydation|chimique)\b/.test(q)) return { code: 'chimie', label: 'Chimie' };
+  if (/\b(cellule|photosynthese|mitose|meiose|adn|genetique|ecosysteme|biologie|corps humain)\b/.test(q)) return { code: 'svt', label: 'SVT / Biologie' };
+  if (/\b(conjugaison|conjugue|grammaire|syntaxe|orthographe|roman|poeme|litterature|figure de style|texte)\b/.test(q)) return { code: 'francais', label: 'Français / Littérature' };
+  if (/\b(guerre|revolution|colonisation|independance|histoire|empire|traite|royaume|president)\b/.test(q)) return { code: 'histoire', label: 'Histoire' };
+  if (/\b(cote d ivoire|afrique|climat|population|geographie|urbanisation|agriculture|peche|mondialisation)\b/.test(q)) return { code: 'geo', label: 'Géographie / Économie' };
+  return { code: 'general', label: 'Recherche éducative universelle' };
 }
 
 export async function searchInternationalAcademicCourse(params: {
@@ -155,11 +240,8 @@ export async function searchInternationalAcademicCourse(params: {
 }): Promise<CourseSearchResult | null> {
   const query = cleanQuery(params.query);
   if (!query) return null;
-
-  // La base internationale garde la priorité lorsqu'elle possède une fiche exacte.
   const builtInMatch = findInternationalCourse(query);
   if (builtInMatch) return builtInMatch;
-
   return searchMultiLingualEncyclopedia(query);
 }
 
@@ -170,36 +252,61 @@ export async function searchMultiLingualEncyclopedia(query: string): Promise<Cou
   try {
     const isEnglish = /\b(the|and|of|in|for|with|what|why|how|define|explain|calculate|difference|between|physics|chemistry|biology|mathematics|history|literature)\b/i.test(cleanQ);
     const languages: Array<'fr' | 'en'> = isEnglish ? ['en', 'fr'] : ['fr', 'en'];
-    const candidates = [];
+    const allCandidates: Array<{ title: string; snippet: string; score: number; lang: 'fr' | 'en' }> = [];
 
     for (const lang of languages) {
-      const candidate = await searchWikipediaCandidate(cleanQ, lang);
-      if (candidate) candidates.push(candidate);
+      const candidates = await searchWikipediaCandidates(cleanQ, lang);
+      allCandidates.push(...candidates);
     }
-    if (!candidates.length) return null;
 
-    candidates.sort((a, b) => b.score - a.score);
-    const best = candidates[0];
-    const targeted = await findBestSection(best.title, best.lang, cleanQ);
-    const content = targeted?.content || best.extract;
-    const heading = targeted?.heading || `Résultat : ${best.title}`;
-    const paragraphs = content.split(/\n+/).map(p => p.trim()).filter(p => p.length > 25);
+    // Déduplication multilingue rudimentaire par titre normalisé.
+    const unique = new Map<string, { title: string; snippet: string; score: number; lang: 'fr' | 'en' }>();
+    for (const candidate of allCandidates) {
+      const key = normalize(candidate.title);
+      const current = unique.get(key);
+      if (!current || candidate.score > current.score) unique.set(key, candidate);
+    }
 
-    const concepts: CourseConceptFormula[] = paragraphs.slice(0, 5).map((p, index) => ({
+    const ranked = Array.from(unique.values()).sort((a, b) => b.score - a.score);
+    if (!ranked.length || ranked[0].score < 12) return null;
+
+    // On vérifie plusieurs candidats : le premier résultat Wikipedia n'est pas
+    // automatiquement considéré comme pertinent.
+    let best: any = null;
+    let bestContent: { heading: string; content: string } | null = null;
+    for (const candidate of ranked.slice(0, 6)) {
+      const summary = await getWikipediaSummary(candidate);
+      if (!summary) continue;
+      const targeted = await findRelevantContent(summary.title, summary.lang, cleanQ);
+      const contentScore = targeted ? overlapScore(meaningfulTokens(cleanQ), targeted.content) : 0;
+      const totalScore = candidate.score + contentScore * 2;
+      if (!best || totalScore > best.totalScore) {
+        best = { ...summary, totalScore };
+        bestContent = targeted;
+      }
+    }
+
+    if (!best) return null;
+
+    const content = bestContent?.content || best.extract;
+    const heading = bestContent?.heading || `Résultat : ${best.title}`;
+    const paragraphs = content.split(/\n+/).map((p: string) => p.trim()).filter((p: string) => p.length > 25);
+    const concepts: CourseConceptFormula[] = paragraphs.slice(0, 6).map((p: string, index: number) => ({
       name: index === 0 ? heading : `Information ${index + 1}`,
       formulaOrRule: p.slice(0, 500),
       explanation: p,
-      contextOrApplication: `Information récupérée pour répondre directement à la requête « ${cleanQ} ».`
+      contextOrApplication: `Passage sélectionné pour sa pertinence avec la requête « ${cleanQ} ».`
     }));
+    const discipline = inferDiscipline(cleanQ);
 
     return {
       query: cleanQ,
-      discipline: 'philo',
-      disciplineLabel: 'Recherche éducative universelle',
+      discipline: discipline.code,
+      disciplineLabel: discipline.label,
       cycle: 'second_cycle_bac',
       level: 'terminale',
       levelLabel: 'Tous niveaux & enseignement supérieur',
-      chapterTitle: targeted ? `${targeted.heading} — ${best.title}` : best.title,
+      chapterTitle: bestContent ? `${bestContent.heading} — ${best.title}` : best.title,
       definitionAndScope: content,
       coreConceptsAndFormulas: concepts,
       stepByStepMethod: [],
@@ -207,7 +314,7 @@ export async function searchMultiLingualEncyclopedia(query: string): Promise<Cou
       classicExamTraps: [],
       selfCheckChecklist: [],
       quickRevisionMemo: paragraphs.slice(0, 2).join(' '),
-      certificationNote: `Source encyclopédique externe : Wikipédia ${best.lang.toUpperCase()}. Le résultat a été sélectionné par correspondance de la requête et du sujet, sans réponse inventée.`,
+      certificationNote: `Source encyclopédique externe : Wikipédia ${best.lang.toUpperCase()}. Résultat sélectionné par correspondance de la requête et vérification du contenu ; aucune réponse générique n'est fabriquée si aucune source pertinente n'est trouvée.`,
       curriculumStandard: 'Recherche éducative universelle',
       isInternational: true,
       directContent: content,
