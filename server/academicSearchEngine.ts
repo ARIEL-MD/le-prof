@@ -2695,24 +2695,12 @@ function extractUniversalSubtopicOrFacet(
 
   // 1. Détection de la facette demandée par l'élève dans sa recherche
   let queryFacet: 'manifestations' | 'causes' | 'consequences' | 'objectifs' | 'principes' | 'organes' | 'limites' | 'atouts' | 'formules' | 'definitions' | 'acteurs' | 'dates' | 'caracteristiques' | 'role' | 'etapes' | 'mecanisme' | 'exemples' | 'general' = 'general';
-  if (/\b(manifestations?|d[eé]roulement|d[eé]roule|faits?|actions?|evenements?|etapes?|phases?|op[eé]rations?)\b/i.test(qClean)) {
-    queryFacet = 'manifestations';
-  } else if (/\b(causes?|origines?|facteurs?|raisons?|d[eé]clencheur|pourquoi|genese)\b/i.test(qClean)) {
+  // Les intentions les plus précises passent avant les facettes génériques
+  // (ex. « rôle » ne doit pas être capturé comme « objectifs »).
+  if (/\b(causes?|origines?|facteurs?|raisons?|d[eé]clencheur|pourquoi|genese)\b/i.test(qClean)) {
     queryFacet = 'causes';
   } else if (/\b(consequences?|bilan|impact|effets?|r[eé]sultats?|retomb[eé]es?|d[eé]nouement|chute)\b/i.test(qClean)) {
     queryFacet = 'consequences';
-  } else if (/\b(objectifs?|buts?|missions?|visent?|r[oô]le)\b/i.test(qClean)) {
-    queryFacet = 'objectifs';
-  } else if (/\b(principes?|r[eè]gles?|fondements?|bases?)\b/i.test(qClean)) {
-    queryFacet = 'principes';
-  } else if (/\b(organes?|structures?|institutions?|fonctionnement|composition)\b/i.test(qClean)) {
-    queryFacet = 'organes';
-  } else if (/\b(limites?|faiblesses?|probl[eè]mes?|difficult[eé]s?|d[eé]fis?|obstacles?|[eé]checs?)\b/i.test(qClean)) {
-    queryFacet = 'limites';
-  } else if (/\b(atouts?|forces?|potentialit[eé]s?|avantages?)\b/i.test(qClean)) {
-    queryFacet = 'atouts';
-  } else if (/\b(formules?|[eé]quations?|th[eé]or[eè]mes?|lois?|propri[eé]t[eé]s?|[eé]nonc[eé])\b/i.test(qClean)) {
-    queryFacet = 'formules';
   } else if (/\b(d[eé]finitions?|d[eé]finir|sens|notion|concept|qu['’]est[- ]ce|c['’]est\s+quoi)\b/i.test(qClean)) {
     queryFacet = 'definitions';
   } else if (/\b(acteurs?|personnages?|protagonistes?|participants?|pays\s+impliqu[eé]s?)\b/i.test(qClean)) {
@@ -2723,12 +2711,26 @@ function extractUniversalSubtopicOrFacet(
     queryFacet = 'caracteristiques';
   } else if (/\b(r[oô]le|importance|utilit[eé]|fonction)\b/i.test(qClean)) {
     queryFacet = 'role';
+  } else if (/\b(objectifs?|buts?|missions?|visent?)\b/i.test(qClean)) {
+    queryFacet = 'objectifs';
+  } else if (/\b(principes?|r[eè]gles?|fondements?|bases?)\b/i.test(qClean)) {
+    queryFacet = 'principes';
+  } else if (/\b(organes?|structures?|institutions?|composition)\b/i.test(qClean)) {
+    queryFacet = 'organes';
+  } else if (/\b(limites?|faiblesses?|probl[eè]mes?|difficult[eé]s?|d[eé]fis?|obstacles?|[eé]checs?|inconvenients?|d[eé]savantages?)\b/i.test(qClean)) {
+    queryFacet = 'limites';
+  } else if (/\b(atouts?|forces?|potentialit[eé]s?|avantages?|b[eé]n[eé]fices?)\b/i.test(qClean)) {
+    queryFacet = 'atouts';
+  } else if (/\b(formules?|[eé]quations?|th[eé]or[eè]mes?|lois?|propri[eé]t[eé]s?|[eé]nonc[eé])\b/i.test(qClean)) {
+    queryFacet = 'formules';
   } else if (/\b([eé]tapes?|phases?|[eé]volution|d[eé]veloppement)\b/i.test(qClean)) {
     queryFacet = 'etapes';
   } else if (/\b(m[eé]canisme|fonctionnement|processus|comment\s+(?:[cç]a|cela)\s+marche)\b/i.test(qClean)) {
     queryFacet = 'mecanisme';
   } else if (/\b(exemples?|illustrations?|cas\s+concrets?|applications?)\b/i.test(qClean)) {
     queryFacet = 'exemples';
+  } else if (/\b(manifestations?|d[eé]roulement|d[eé]roule|faits?|actions?|evenements?|op[eé]rations?)\b/i.test(qClean)) {
+    queryFacet = 'manifestations';
   }
 
   // Filtrer les tokens pour ne garder que les mots sujets discriminants (sans les mots de facettes)
