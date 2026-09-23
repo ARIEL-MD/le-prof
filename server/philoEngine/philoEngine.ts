@@ -1578,28 +1578,18 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
     };
   });
 
-  // 3. CONCLUSION EN 3 TEMPS (Sans cliché)
-  const bilanSynthese = isPhiloExtinctionOrPasser
-    ? "Au terme de notre analyse, il convient de retenir que la philosophie peut s’effacer de l’ordonnancement du savoir et de la vie humaine."
-    : isMytheRaison
-    ? "Au terme de notre réflexion, il apparaît que si le mythe et la raison s'opposent sur le terrain de la méthode et de la démonstration, ils ne se contredisent point sur le terrain du sens."
-    : matchedRelation?.conclusion.bilanSynthese || `Au terme de notre réflexion, il apparaît que ${thesisToUse.title.toLowerCase()}.`;
+  // 3. CONCLUSION EN 3 TEMPS — ancrée sur le sujet exact.
+  const bilanSynthese =
+    `Au terme de notre analyse, la question « ${subjectExact} » montre que la première réponse doit être confrontée à ses limites et à ses conditions de validité.`;
 
-  const reponseDefinitive = isPhiloExtinctionOrPasser
-    ? "Toutefois, force est de reconnaître que la philosophie demeure indispensable dans la vie de l’homme."
-    : isMytheRaison
-    ? "Toutefois, nous soutenons que le mythe n'est nullement aux antipodes de la raison : il en est la matrice symbolique première."
-    : matchedRelation?.conclusion.reponseDefinitive || `Toutefois, force est de reconnaître que ${antithesisToUse.title.toLowerCase()}.`;
+  const reponseDefinitive =
+    `Ainsi, la réponse à « ${subjectExact} » doit tenir ensemble l'argument initial et l'objection qui le met à l'épreuve, sans remplacer la relation posée par le sujet par une réflexion sur une notion isolée.`;
 
-  const elargissement = isPhiloExtinctionOrPasser
-    ? "En ce qui nous concerne, nous dirons que la philosophie est essentielle pour orienter l’homme vers la vérité, la liberté, le bonheur et la connaissance de soi."
-    : isMytheRaison
-    ? "Dès lors, une raison qui éliminerait tout mythe ne s'exposerait-elle pas à créer ses propres illusions modernes ?"
-    : matchedRelation?.conclusion.elargissement || `En ce qui nous concerne, nous dirons que ${matchedNotion.name.toLowerCase()} trouve son sens le plus haut lorsqu'elle aide l'homme à vivre librement, avec lucidité et dans le respect de sa dignité.`;
+  const elargissement =
+    `En définitive, l'enjeu de « ${subjectExact} » est de déterminer les conditions dans lesquelles les termes de la question peuvent être pensés ensemble sans les confondre ni les opposer artificiellement.`;
 
   const conclusionFullText = `${bilanSynthese} ${reponseDefinitive} ${elargissement}`;
 
-  // ==========================================================================
   // CONTRÔLE SILENCIEUX & VALIDATION DES 8 RÈGLES MÉTHODOLOGIQUES CANONIQUES
   // ==========================================================================
   const rawComponentsToValidate: PhiloComponentsToValidate = {
