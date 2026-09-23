@@ -124,7 +124,8 @@ export function parseAndAnalyzePhiloSubject(rawSubject: string): ParsedSubjectAn
 
   // The exact question is canonical. Every downstream stage can recover it verbatim.
   const problemeCourt = exact;
-  const aspect1 = `Dans quelle mesure la réponse directe à « ${clean} » est-elle défendable ?`;
+  const subjectWithoutMeasure = clean.replace(/^(?:dans\\s+quelle\\s+mesure|jusqu['’]à\\s+quel\\s+point|en\\s+quoi)\\s+/i, "").trim();
+  const aspect1 = `Dans quelle mesure la réponse directe à « ${subjectWithoutMeasure} » est-elle défendable ?`;
   const aspect2 = buildOpposingQuestion(clean);
   const reformulation = buildReformulation(clean, modal);
 
