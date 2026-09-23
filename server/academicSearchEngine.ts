@@ -4672,6 +4672,8 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
   const has = (text: string, token: string) => new RegExp('\\b' + escaped(token) + '\\b', 'i').test(text);
   let titleHits = 0, bodyHits = 0;
   for (const token of coreTokens) { if (has(title, token)) titleHits++; if (has(body, token)) bodyHits++; }
+  const distinctiveTokens = coreTokens.filter(t => t.length >= 5 || /^\\d+$/.test(t));
+  if (distinctiveTokens.some(token => !has(title, token) && !has(body, token))) return false;
   if (exactOnlyTokens.some(token => !has(title, token))) return false;
   if (coreTokens.every(token => has(title, token))) return true;
   if (coreTokens.length === 1) return titleHits >= 1;
