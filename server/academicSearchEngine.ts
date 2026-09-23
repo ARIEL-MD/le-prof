@@ -2583,7 +2583,7 @@ function extractUniversalSubtopicOrFacet(
   if (!course.fullCourseContent) return undefined;
 
   // 1. Détection de la facette demandée par l'élève dans sa recherche
-  let queryFacet: 'manifestations' | 'causes' | 'consequences' | 'objectifs' | 'principes' | 'organes' | 'limites' | 'atouts' | 'formules' | 'definitions' | 'general' = 'general';
+  let queryFacet: 'manifestations' | 'causes' | 'consequences' | 'objectifs' | 'principes' | 'organes' | 'limites' | 'atouts' | 'formules' | 'definitions' | 'acteurs' | 'dates' | 'caracteristiques' | 'role' | 'etapes' | 'mecanisme' | 'exemples' | 'general' = 'general';
   if (/\b(manifestations?|d[eé]roulement|d[eé]roule|faits?|actions?|evenements?|etapes?|phases?|op[eé]rations?)\b/i.test(qClean)) {
     queryFacet = 'manifestations';
   } else if (/\b(causes?|origines?|facteurs?|raisons?|d[eé]clencheur|pourquoi|genese)\b/i.test(qClean)) {
@@ -2604,6 +2604,20 @@ function extractUniversalSubtopicOrFacet(
     queryFacet = 'formules';
   } else if (/\b(d[eé]finitions?|d[eé]finir|sens|notion|concept|qu['’]est[- ]ce|c['’]est\s+quoi)\b/i.test(qClean)) {
     queryFacet = 'definitions';
+  } else if (/\b(acteurs?|personnages?|protagonistes?|participants?|pays\s+impliqu[eé]s?)\b/i.test(qClean)) {
+    queryFacet = 'acteurs';
+  } else if (/\b(dates?|chronologie|chronologique|ann[eé]es?|p[eé]riodes?|rep[eè]res?)\b/i.test(qClean)) {
+    queryFacet = 'dates';
+  } else if (/\b(caract[eé]ristiques?|traits?|particularit[eé]s?)\b/i.test(qClean)) {
+    queryFacet = 'caracteristiques';
+  } else if (/\b(r[oô]le|importance|utilit[eé]|fonction)\b/i.test(qClean)) {
+    queryFacet = 'role';
+  } else if (/\b([eé]tapes?|phases?|[eé]volution|d[eé]veloppement)\b/i.test(qClean)) {
+    queryFacet = 'etapes';
+  } else if (/\b(m[eé]canisme|fonctionnement|processus|comment\s+(?:[cç]a|cela)\s+marche)\b/i.test(qClean)) {
+    queryFacet = 'mecanisme';
+  } else if (/\b(exemples?|illustrations?|cas\s+concrets?|applications?)\b/i.test(qClean)) {
+    queryFacet = 'exemples';
   }
 
   // Filtrer les tokens pour ne garder que les mots sujets discriminants (sans les mots de facettes)
@@ -2611,7 +2625,10 @@ function extractUniversalSubtopicOrFacet(
     'manifestation','manifestations','deroulement','faits','fait','evenements','evenement','actions','action','etapes','etape',
     'causes','cause','origines','origine','facteurs','facteur','pourquoi','consequences','consequence','bilan','effets','impact',
     'objectifs','objectif','buts','but','missions','mission','principes','principe','regles','regle','organes','organe','structures','structure',
-    'limites','limite','faiblesses','faiblesse','defis','defi','problemes','probleme','difficultes','difficulte','atouts','atout','forces','force',
+    'limites','limite','faiblesses','faiblesse','defis','defi','problemes','probleme','difficultes','difficulte','inconvenients','inconvenient','desavantages','desavantage',
+    'atouts','atout','forces','force','avantages','avantage','benefices','benefice','acteurs','acteur','personnages','personnage','protagonistes','protagoniste',
+    'dates','date','chronologie','chronologique','annees','annee','periodes','periode','reperes','repere','caracteristiques','caracteristique','traits','particularites',
+    'role','importance','utilite','fonction','etapes','etape','phases','phase','evolution','developpement','mecanisme','fonctionnement','processus','exemples','exemple','applications','application',
     'formule','formules','theoreme','theoremes','propriete','proprietes','loi','lois','definition','definitions','definir'
   ]);
   const coreSubjectTokens = tokens.filter(t => !facetWordsSet.has(t) && t.length >= 2);
