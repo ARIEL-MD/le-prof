@@ -48,6 +48,9 @@ export function detectModalType(cleanSubject: string): ParsedSubjectAnalysis["mo
   if (/^doit-on\b|\bl['’]homme\s+doit-il\b|\bavons-nous\s+le\s+devoir\b/i.test(s)) return "DOIT_ON";
   if (/^pourquoi\b/i.test(s)) return "POURQUOI";
   if (/^(?:est-il|est-elle|sont-ils|sont-elles)\b|\b(?:est|sont)-t-(?:il|elle|ils|elles)\b|\b[a-zà-ÿ][^?]*?-(?:t-il|t-elle|il|elle)\b/i.test(s)) return "EST_IL";
+  if (/\bpeut-(?:il|elle)\b|\bpeuvent-(?:ils|elles)\b/i.test(s)) return "PEUT_ON";
+  if (/\bfaut-(?:il|elle)\b/i.test(s)) return "FAUT_IL";
+  if (/\bdoit-(?:il|elle)\b|\bdoivent-(?:ils|elles)\b/i.test(s)) return "DOIT_ON";
 
   return "GENERIC";
 }
@@ -177,19 +180,18 @@ export function parseAndAnalyzePhiloSubject(rawSubject: string): ParsedSubjectAn
   if (!problemeCourt.endsWith("?")) {
     problemeCourt += " ?";
   }
-  // Enlever les préambules interrogatifs redondants
-  problemeCourt = problemeCourt.replace(/^dans\s+quelle\s+mesure\s+/i, "");
-  problemeCourt = problemeCourt.replace(/^en\s+quoi\s+/i, "");
-  problemeCourt = problemeCourt.replace(/^pourquoi\s+/i, "");
+  // The exact question is canonical: never strip its interrogative operator.
   if (problemeCourt.length > 0) {
     problemeCourt = problemeCourt.charAt(0).toUpperCase() + problemeCourt.slice(1);
   }
 
   // 2. Aspect 1 : commence par "dans quelle mesure [affirmation] ?"
-  const aspect1 = `dans quelle mesure ${clean} ?`;
+  const alreadyInterrogative = /^(?:dans\s+quelle\s+mesure|en\s+quoi|comment|pourquoi|à\s+quelles\s+conditions|jusqu'à\s+quel\s+point)\b/i.test(clean);
+  const aspect1 = alreadyInterrogative ? `${clean} ?` : `dans quelle mesure ${clean} ?`;
 
   // 3. Aspect 2 : question contrastée interrogative
-  const aspect2 = buildOpposingQuestion(clean, modal);
+  const rawAspect2 = buildOpposingQuestion(clean, modal);
+  const aspect2 = rawAspect2.includes(clean) ? rawAspect2 : `${rawAspect2} La question exacte « ${clean} » reste la référence de cette objection.`;
 
   // 4. Reformulation spécifique sans gabarit plat
   let reformulation = "";
@@ -206,7 +208,7 @@ export function parseAndAnalyzePhiloSubject(rawSubject: string): ParsedSubjectAn
   } else if (modal === "SUFFIT_IL") {
     reformulation = `La réflexion consiste à distinguer la simple condition préalable de la condition suffisante : ce facteur suffit-il à lui seul à produire le résultat escompté, ou appelle-t-il d'autres médiations ?`;
   } else {
-    reformulation = `Ce sujet invite à confronter l'opinion commune immédiate à une analyse critique rigoureuse afin d'éclairer la tension philosophique contenue dans « ${clean} ».`;
+    reformulation = `Le problème doit être construit à partir de la question exacte « ${clean} ». Il faut en déterminer le sens précis, examiner les raisons d'une première réponse, puis les objections et limites qui imposent une réponse plus nuancée, sans remplacer le rapport entre les termes du sujet par une réflexion générale sur une seule notion.`;
   }
 
   const exactSubjectAnchor = `Sujet exact : « ${clean} ? »`;
