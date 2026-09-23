@@ -2227,7 +2227,7 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
     const isAuthorIntent = intent === "AUTHOR";
 
     const effectiveExtract = targetedText || extract;
-    const effectiveSentences = effectiveExtract.split(/(?<=[.!?])\\s+/).filter((s: string) => s.length > 20);
+    const effectiveSentences = effectiveExtract.split(/(?<=[.!?])\s+/).filter((s: string) => s.length > 20);
     const concepts: CourseConceptFormula[] = [
       {
         name: targetedSection
@@ -2309,7 +2309,25 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
       discLabel = "Mathématiques";
     }
 
-    const chapterPrefix = isArgumentIntent 
+    const targetedPrefix: Record<string, string> = {
+      CAUSES: "Causes & Origines",
+      CONSEQUENCES: "Conséquences & Bilan",
+      ACTORS: "Acteurs & Parties prenantes",
+      DATES: "Dates & Chronologie",
+      CHARACTERISTICS: "Caractéristiques",
+      ROLE: "Rôle & Importance",
+      OBJECTIVES: "Objectifs & Missions",
+      PRINCIPLES: "Principes & Fondements",
+      LIMITS: "Limites & Critiques",
+      ADVANTAGES: "Avantages & Atouts",
+      STAGES: "Étapes & Évolution",
+      MECHANISM: "Mécanisme & Fonctionnement",
+      EXAMPLES: "Exemples & Applications",
+      DEFINITION: "Définition",
+    };
+    const chapterPrefix = targetedSection
+      ? (targetedPrefix[intent] || "Réponse ciblée")
+      : isArgumentIntent 
       ? "Arguments & Analyse Critique"
       : isCitationIntent
       ? "Citations, Auteurs & Concepts"
