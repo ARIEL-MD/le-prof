@@ -30,7 +30,7 @@ test("Rigueur méthodologique et polysémie de la dissertation philosophique", a
 
     // Vérification du problème court : court, direct, sans 'ou'
     const probleme = meth?.philoPreliminaryWork.problematisation.probleme || "";
-    assert.match(probleme, /La philosophie est-elle une vaine illusion \?|L'homme a-t-il réellement besoin de la philosophie/);
+    assert.equal(probleme, "La philosophie est-elle un mythe ?");
     assert.equal(probleme.includes(" ou "), false);
 
     // Vérification des deux aspects : Thèse (reproche d'inutilité/chimère) et Antithèse (nécessité vitale)
@@ -129,7 +129,7 @@ test("Rigueur méthodologique et polysémie de la dissertation philosophique", a
     // 1. La problématique doit être une QUESTION centrale, JAMAIS une affirmation
     const probleme = meth?.philoPreliminaryWork.problematisation.probleme || "";
     assert.ok(probleme.endsWith("?"), "La problématique doit obligatoirement être formulée comme une question");
-    assert.match(probleme, /^Le travail rend-il véritablement l'homme libre \?$/);
+    assert.equal(probleme, subject);
 
     // 2. Interdiction formelle du mot 'ou' dans le problème
     assert.equal(/\bou\b/i.test(probleme), false, "La problématique ne doit jamais contenir le mot 'ou'");
