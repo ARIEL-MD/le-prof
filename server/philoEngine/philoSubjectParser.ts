@@ -47,7 +47,7 @@ export function detectModalType(cleanSubject: string): ParsedSubjectAnalysis["mo
   if (/^faut-il\b|\best-il\s+necessaire\b/i.test(s)) return "FAUT_IL";
   if (/^doit-on\b|\bl['’]homme\s+doit-il\b|\bavons-nous\s+le\s+devoir\b/i.test(s)) return "DOIT_ON";
   if (/^pourquoi\b/i.test(s)) return "POURQUOI";
-  if (/^(?:est-il|est-elle|sont-ils|sont-elles)\b|\b(?:est|sont)-t-(?:il|elle|ils|elles)\b/i.test(s)) return "EST_IL";
+  if (/^(?:est-il|est-elle|sont-ils|sont-elles)\b|\b(?:est|sont)-t-(?:il|elle|ils|elles)\b|\b[a-zà-ÿ][^?]*?-(?:t-il|t-elle|il|elle)\b/i.test(s)) return "EST_IL";
 
   return "GENERIC";
 }
@@ -186,7 +186,7 @@ export function parseAndAnalyzePhiloSubject(rawSubject: string): ParsedSubjectAn
   }
 
   // 2. Aspect 1 : commence par "dans quelle mesure [affirmation] ?"
-  const aspect1 = `dans quelle mesure ${affirmation} ?`;
+  const aspect1 = `dans quelle mesure ${clean} ?`;
 
   // 3. Aspect 2 : question contrastée interrogative
   const aspect2 = buildOpposingQuestion(clean, modal);
@@ -208,6 +208,9 @@ export function parseAndAnalyzePhiloSubject(rawSubject: string): ParsedSubjectAn
   } else {
     reformulation = `Ce sujet invite à confronter l'opinion commune immédiate à une analyse critique rigoureuse afin d'éclairer la tension philosophique contenue dans « ${clean} ».`;
   }
+
+  const exactSubjectAnchor = `Sujet exact : « ${clean} ? »`;
+  if (!reformulation.includes(clean)) reformulation = `${reformulation} ${exactSubjectAnchor}`.trim();
 
   return {
     modalType: modal,

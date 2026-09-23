@@ -904,17 +904,6 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
     reformulation = parsedSubject.reformulation;
   }
 
-  // EXACT-SUBJECT-PROBLEM-GUARD
-  // Never replace the question supplied by the student with a generic question
-  // based only on a notion such as bonheur, liberté, vérité, etc.
-  problemeCourt = subjectAsProblem(subjectExact);
-
-  // EXACT-SUBJECT-REFORMULATION-GUARD
-  const exactParsedSubject = parseAndAnalyzePhiloSubject(subjectExact);
-  if (exactParsedSubject.reformulation && exactParsedSubject.reformulation.length >= 20) {
-    reformulation = exactParsedSubject.reformulation;
-  }
-
   // C. Problématisation du sujet
   // RÈGLE ABSOLUE : LE PROBLÈME DOIT OBLIGATOIREMENT ÊTRE UNE QUESTION CENTRALE DIRECTE.
   // INTERDICTIONS STRICTES :
