@@ -4105,6 +4105,20 @@ PRINCIPES Son action repose sur :
 }
 
 /** Recherche sémantique locale multi-pistes : requête complète + noyau lexical + paires de termes, puis classement des candidats. */
+function inferSemanticDiscipline(query: string): DisciplineType | undefined {
+  const q = normalizeString(query);
+  if (/\b(francais|français|litterature|poesie|poeme|roman|theatre|figure|stylistique|mouvement|annales|expression ecrite|dissertation litteraire)\b/i.test(q)) return 'francais';
+  if (/\b(guerre|colonisation|decolonisation|onu|nations unies|independance|independance|revolution|bipolarisation|guerre froide|histoire|dates historiques|seconde guerre|premiere guerre|ceDEAO|union africaine|burkina)\b/i.test(q)) return 'histoire';
+  if (/\b(geographie|agriculture|population|climat|relief|industrie|commerce|economie|territoire|urbanisation|mondialisation)\b/i.test(q)) return 'geographie';
+  if (/\b(math|mathematique|equation|fonction|derivee|integrale|probabilite|geometrie|pythagore|thales|trigonometrie)\b/i.test(q)) return 'mathematiques';
+  if (/\b(physique|chimie|newton|force|vitesse|energie|oxydation|reaction chimique|dosage|acide|base)\b/i.test(q)) return 'physique_chimie';
+  if (/\b(svt|biologie|cellule|genetique|adn|mitose|meiose|immunologie|anatomie|ecosysteme)\b/i.test(q)) return 'svt';
+  if (/\b(anglais|english)\b/i.test(q)) return 'anglais';
+  if (/\b(allemand|deutsch)\b/i.test(q)) return 'allemand';
+  if (/\b(espagnol|espanol|castillan)\b/i.test(q)) return 'espagnol';
+  if (/\b(philosophie|philosophique|liberte|conscience|inconscient|autrui|bonheur|desir|verite|justice|droit|morale|raison|religion|art|travail|langage|societe|etat|violence)\b/i.test(q)) return 'philo';
+  return undefined;
+}
 function buildSemanticSearchVariants(rawQuery: string): string[] {
   const normalized = normalizeString(rawQuery).trim();
   const stopWords = new Set(['donne','donner','donnez','moi','svp','stp','merci','cherche','recherche','trouve','trouver','explique','expliquer','parle','parler','cours','fiche','notion','definition','definir','signification','argument','arguments','citation','citations','exemple','exemples','present','présent','conjugaison','conjuguer','temps','mode','forme','formes','sur','pour','avec','dans','de','du','des','la','le','les','un','une','au','aux','en','et','ou','ce','cette','ces','qui','est','sont','que','quoi','comment','pourquoi','peut','peuvent','faut','doit','doivent','est-il','est-ce','a','à','d','l']);
@@ -4617,7 +4631,8 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
 
   // 6.ter Recherche sémantique multi-pistes dans les corpus locaux extensibles.
   const hasSuspiciousIdentifier = /\b\d{6,}\b/.test(normalizeString(rawQuery));
-  const semanticFallback = hasSuspiciousIdentifier ? null : await searchLocalSemanticFallback(rawQuery, params.level, params.discipline, params.serie);
+  const semanticDiscipline = params.discipline || inferSemanticDiscipline(rawQuery);
+  const semanticFallback = hasSuspiciousIdentifier ? null : await searchLocalSemanticFallback(rawQuery, params.level, semanticDiscipline, params.serie);
   const semanticTokens = buildSemanticSearchVariants(rawQuery)[1]?.split(/\s+/).filter(t => t.length >= 3) || [];
   const semanticTitle = normalizeString(semanticFallback?.chapterTitle || '');
   const semanticStrongMatch = semanticFallback && semanticTokens.length >= 2 && semanticTokens.filter(t => semanticTitle.includes(t)).length >= 1;
