@@ -219,3 +219,53 @@ describe("Recherche de Cours & Notions — anti faux positifs", () => {
   });
 
 });
+
+
+describe("Recherche universelle — intentions et sujets inédits", () => {
+  it("retourne réellement la facette demandée pour les causes de la guerre froide", async () => {
+    const res = await searchAcademicCourseUnified({ query: "causes de la guerre froide" });
+    assert.equal(res.noResult, undefined);
+    assert.match(res.chapterTitle, /guerre froide/i);
+    assert.match(res.chapterTitle, /causes|origines/i);
+    assert.match(res.definitionAndScope, /cause|origine|contexte|déclench/i);
+  });
+
+  it("conserve le même sujet pour conséquences, acteurs et dates", async () => {
+    const queries = [
+      { q: "conséquences de la guerre froide", facet: /conséquences|bilan/i },
+      { q: "acteurs de la guerre froide", facet: /acteurs|parties prenantes/i },
+      { q: "dates de la guerre froide", facet: /dates|chronologie/i }
+    ];
+
+    for (const item of queries) {
+      const res = await searchAcademicCourseUnified({ query: item.q });
+      assert.equal(res.noResult, undefined, item.q);
+      assert.match(res.chapterTitle, /guerre froide/i, item.q);
+      assert.match(res.chapterTitle, item.facet, item.q);
+    }
+  });
+
+  it("comprend des formulations inédites sans dépendre d'une liste de requêtes", async () => {
+    const res = await searchAcademicCourseUnified({
+      query: "pourquoi la chute du mur de Berlin a-t-elle marqué la fin de la guerre froide"
+    });
+    assert.equal(res.noResult, undefined);
+    assert.match(res.chapterTitle, /Berlin|guerre froide/i);
+    assert.ok(res.definitionAndScope.length > 50);
+  });
+
+  it("couvre plusieurs domaines avec la même logique de facettes", async () => {
+    const cases = [
+      { q: "définition de la mitose", title: /mitose/i },
+      { q: "mécanisme de la photosynthèse", title: /photosynthèse|photosynthese/i },
+      { q: "rôle de l'ONU", title: /ONU/i },
+      { q: "avantages de la mondialisation", title: /mondialisation/i }
+    ];
+
+    for (const item of cases) {
+      const res = await searchAcademicCourseUnified({ query: item.q });
+      assert.equal(res.noResult, undefined, item.q);
+      assert.match(res.chapterTitle, item.title, item.q);
+    }
+  });
+});
