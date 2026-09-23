@@ -1042,36 +1042,10 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
 
     return "toutefois, ne convient-il pas de soutenir la position inverse ?";
   };
-
-  // Les 2 Aspects du sujet :
-  // - Aspect 1 : Le sujet lui-même commençant par "dans quelle mesure" (sans argument anticipé)
-  // - Aspect 2 : Une question interrogative courte qui pose l'antithèse commençant par "toutefois, "
-  let aspect1 = extractSubjectForAspect1(subjectExact);
-  let aspect2 = buildAspect2Interrogative(cleanSubjectNorm);
-
-  if (isPhiloExtinctionOrPasser) {
-    aspect1 = "dans quelle mesure la philosophie pourrait s’effacer de l’ordonnancement du savoir et de la vie humaine ?";
-    aspect2 = "toutefois, n’est-elle pas indispensable dans la vie de l’homme ?";
-  } else if (isPhiloMythe) {
-    aspect1 = "dans quelle mesure la philosophie est-elle perçue comme chimérique et inutile à la vie pratique ?";
-    aspect2 = "toutefois, ne constitue-t-elle pas une nécessité vitale pour l'homme ?";
-  } else if (isMytheRaison) {
-    aspect1 = "dans quelle mesure le mythe s'oppose-t-il aux exigences de la raison ?";
-    aspect2 = "toutefois, ne recèle-t-il pas une rationalité féconde pour la raison ?";
-  } else if (matchedRelation) {
-    aspect1 = matchedRelation.aspect1;
-    aspect2 = matchedRelation.aspect2;
-  } else if (/travail/i.test(cleanSubjectNorm) && /libert|libre/i.test(cleanSubjectNorm)) {
-    aspect1 = "dans quelle mesure le travail constitue-t-il un moyen d'émancipation humaine ?";
-    aspect2 = "toutefois, ne peut-il pas devenir une source d'aliénation ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm) && /mythe|illusion|chim[èe]re|inutile|inutilit[ée]/i.test(cleanSubjectNorm)) {
-    aspect1 = "dans quelle mesure la philosophie est-elle perçue comme chimérique et inutile à la vie pratique ?";
-    aspect2 = "toutefois, ne constitue-t-elle pas une nécessité vitale pour l'homme ?";
-  } else {
-    const parsedSubject = parseAndAnalyzePhiloSubject(subjectExact);
-    aspect1 = parsedSubject.aspect1;
-    aspect2 = parsedSubject.aspect2;
-  }
+  // ASPECTS UNIVERSELS : conserver la relation exacte du sujet.
+  const parsedSubjectForAspects = parseAndAnalyzePhiloSubject(subjectExact);
+  let aspect1 = parsedSubjectForAspects.aspect1;
+  let aspect2 = parsedSubjectForAspects.aspect2;
 
   // Normalisation des aspects pour l'insertion fluide dans l'annonce du plan sans formules clichées
   const lowerFirst = (s: string) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : "");
