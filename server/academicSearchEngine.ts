@@ -60,6 +60,11 @@ import { ensureNumberedTitlesBold } from "../src/utils/textFormatter";
 const searchCache = new Map<string, CourseSearchResult>();
 const MAX_CACHE_SIZE = 500;
 
+// Cache des sources externes : évite de répéter les mêmes appels Wikipédia/Wikidata
+// pendant une session et réduit fortement la latence sur les recherches récurrentes.
+const externalKnowledgeCache = new Map<string, CourseSearchResult | null>();
+const MAX_EXTERNAL_CACHE_SIZE = 300;
+
 /**
  * Nettoie toute mention superflue de classe ou d'examen spécifique (ex: 3ème, BEPC, Classe de 3ème)
  * dans les synthèses et démarches d'examen.
@@ -2167,6 +2172,124 @@ async function searchWikipediaTargetedSection(
 
     if (content.length < 80) return null;
     return { heading: selected.title, content };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fallback structuré Wikidata.
+ * Utilisé uniquement lorsqu'une recherche encyclopédique textuelle n'a pas donné
+ * de résultat suffisamment exploitable. Il apporte des faits structurés (label,
+ * description, dates, lieux, professions et autres relations disponibles) sans IA.
+ */
+async function searchWikidataKnowledge(query: string, intent: string): Promise<CourseSearchResult | null> {
+  const { topic } = extractCleanSearchTopic(query);
+  const cleanTerm = topic.trim();
+  if (!cleanTerm || cleanTerm.length < 2) return null;
+
+  const cacheKey = `wikidata:${normalizeString(cleanTerm)}:${intent}`;
+  if (externalKnowledgeCache.has(cacheKey)) return externalKnowledgeCache.get(cacheKey) || null;
+
+  try {
+    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(cleanTerm)}&language=fr&uselang=fr&format=json&limit=5`;
+    const searchRes = await fetch(searchUrl, {
+      headers: { "User-Agent": "LeProfEducationBot/1.0 (educational search engine)" },
+      signal: AbortSignal.timeout(3500)
+    });
+    if (!searchRes.ok) return null;
+
+    const searchData: any = await searchRes.json();
+    const entities = Array.isArray(searchData?.search) ? searchData.search : [];
+    if (!entities.length) return null;
+
+    const normalizedTerm = normalizeString(cleanTerm);
+    const ranked = entities
+      .map((entity: any, index: number) => {
+        const label = normalizeString(String(entity?.label || ""));
+        const description = normalizeString(String(entity?.description || ""));
+        const aliases = Array.isArray(entity?.aliases) ? entity.aliases.map((a: any) => normalizeString(String(a?.value || ""))) : [];
+        const exact = label === normalizedTerm ? 100 : 0;
+        const labelTokens = normalizedTerm.split(/\\s+/).filter(Boolean).filter((t: string) => t.length >= 3);
+        const tokenHits = labelTokens.filter((t: string) => label.includes(t)).length;
+        const aliasHit = aliases.some((a: string) => a === normalizedTerm) ? 20 : 0;
+        return { entity, score: exact + tokenHits * 15 + aliasHit + (description ? 2 : 0) - index * 0.5 };
+      })
+      .sort((a: any, b: any) => b.score - a.score);
+
+    const entity = ranked[0]?.entity;
+    const entityId = String(entity?.id || "");
+    if (!entityId) return null;
+
+    const entityUrl = `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(entityId)}.json`;
+    const entityRes = await fetch(entityUrl, {
+      headers: { "User-Agent": "LeProfEducationBot/1.0 (educational search engine)" },
+      signal: AbortSignal.timeout(3500)
+    });
+    if (!entityRes.ok) return null;
+
+    const entityData: any = await entityRes.json();
+    const item = entityData?.entities?.[entityId];
+    if (!item) return null;
+
+    const label = String(item?.labels?.fr?.value || item?.labels?.en?.value || entity?.label || cleanTerm);
+    const description = String(item?.descriptions?.fr?.value || item?.descriptions?.en?.value || entity?.description || "").trim();
+    const claims = item?.claims || {};
+
+    const firstClaimValue = (property: string): string | null => {
+      const claim = Array.isArray(claims[property]) ? claims[property][0] : null;
+      const snak = claim?.mainsnak;
+      const datavalue = snak?.datavalue;
+      if (!datavalue) return null;
+      if (datavalue.type === "time") return String(datavalue.value?.time || "").replace(/^\\+/, "");
+      if (datavalue.type === "string") return String(datavalue.value);
+      if (datavalue.type === "monolingualtext") return String(datavalue.value?.text || "");
+      return null;
+    };
+
+    const dateOfBirth = firstClaimValue("P569");
+    const dateOfDeath = firstClaimValue("P570");
+    const placeOfBirth = firstClaimValue("P19");
+    const occupation = firstClaimValue("P106");
+
+    const facts: string[] = [];
+    if (description) facts.push(`Description : ${description}.`);
+    if (dateOfBirth) facts.push(`Date de naissance (Wikidata) : ${dateOfBirth}.`);
+    if (dateOfDeath) facts.push(`Date de décès (Wikidata) : ${dateOfDeath}.`);
+    if (placeOfBirth) facts.push(`Lieu de naissance (identifiant structuré) : ${placeOfBirth}.`);
+    if (occupation) facts.push(`Profession / fonction (identifiant structuré) : ${occupation}.`);
+
+    if (facts.length === 0) return null;
+
+    const result: CourseSearchResult = {
+      query,
+      discipline: "philo",
+      disciplineLabel: "Savoirs académiques & connaissances structurées",
+      cycle: "second_cycle_bac",
+      level: "terminale",
+      levelLabel: "Collège, Lycée & Supérieur",
+      chapterTitle: `${label} : Données structurées`,
+      definitionAndScope: facts.join("\\n"),
+      coreConceptsAndFormulas: [{
+        name: `Identité structurée : ${label}`,
+        formulaOrRule: description || `Entité Wikidata ${entityId}`,
+        explanation: "Données structurées issues de Wikidata, utilisées comme complément lorsque les cours locaux et les articles encyclopédiques ne suffisent pas.",
+        contextOrApplication: `Identifiant de connaissance : ${entityId}.`
+      }],
+      stepByStepMethod: [],
+      solvedExample: { problemStatement: "", solutionStepByStep: "", finalAnswer: "" },
+      classicExamTraps: [],
+      selfCheckChecklist: [],
+      quickRevisionMemo: facts.slice(0, 2).join(" "),
+      certificationNote: "Source de connaissance structurée externe (Wikidata), à recouper avec les cours et sources pédagogiques pour un usage évaluatif."
+    };
+
+    if (externalKnowledgeCache.size >= MAX_EXTERNAL_CACHE_SIZE) {
+      const firstKey = externalKnowledgeCache.keys().next().value;
+      if (firstKey) externalKnowledgeCache.delete(firstKey);
+    }
+    externalKnowledgeCache.set(cacheKey, result);
+    return result;
   } catch {
     return null;
   }
@@ -4733,6 +4856,14 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
   if (encyclopediaResult) {
     saveToCache(cacheKey, encyclopediaResult);
     return encyclopediaResult;
+  }
+
+  // 6.5. Connaissance structurée Wikidata : dernier recours externe avant le no-result.
+  // Cette source n'est jamais utilisée pour remplacer une fiche locale pertinente.
+  const wikidataResult = await searchWikidataKnowledge(rawQuery, extractCleanSearchTopic(rawQuery).intent);
+  if (wikidataResult && isSearchResultRelevant(wikidataResult, rawQuery)) {
+    saveToCache(cacheKey, wikidataResult);
+    return wikidataResult;
   }
 
   // 7. Aucun résultat suffisamment fiable : ne jamais fabriquer une fiche générique.
