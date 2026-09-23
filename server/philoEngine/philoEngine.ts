@@ -850,59 +850,9 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
     antithesisToUse = { ...antithesisToUse, arguments: clonedAntiArgs };
   }
 
-  let reformulation = "";
-  if (isPhiloExtinctionOrPasser) {
-    reformulation = "La réflexion philosophique est-elle devenue une discipline vaine qu'il conviendrait d'écarter de l'organisation du savoir et de l'action, ou demeure-t-elle au contraire le fondement irremplaçable pour penser et guider l'existence humaine ?";
-  } else if (isPhiloMythe) {
-    reformulation = "La philosophie est-elle seulement un bavardage inutile et une illusion sans effet concret, ou représente-t-elle au contraire une nécessité essentielle pour apprendre à penser par soi-même et vivre dignement ?";
-  } else if (isMytheRaison) {
-    reformulation = "Le mythe s'oppose-t-il radicalement à l'exercice rationnel de la pensée, ou recèle-t-il au contraire une rationalité symbolique qui prépare et féconde la raison ?";
-  } else if (matchedRelation) {
-    reformulation = matchedRelation.reformulationPattern;
-  } else if (/technique|progres/i.test(cleanSubjectNorm) && /bonheur/i.test(cleanSubjectNorm)) {
-    reformulation = "Le développement des techniques et des machines permet-il réellement à l'homme d'être plus heureux ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm) && /mythe|illusion|chim[èe]re|inutile|inutilit[ée]|bavardage/i.test(cleanSubjectNorm)) {
-    reformulation = "La philosophie est-elle seulement un bavardage inutile et une illusion sans effet concret, ou représente-t-elle au contraire une nécessité essentielle pour apprendre à penser par soi-même et vivre dignement ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm) && /passer/i.test(cleanSubjectNorm)) {
-    reformulation = "L'homme peut-il se passer de la réflexion philosophique sans risquer de perdre le sens de sa vie et de ses choix ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm)) {
-    reformulation = "L'homme peut-il se passer de la réflexion philosophique sans risquer de perdre le sens de sa vie et de ses choix ?";
-  } else if (/travail/i.test(cleanSubjectNorm) && /libert|libre/i.test(cleanSubjectNorm)) {
-    reformulation = "L'activité laborieuse permet-elle à l'homme de s'affranchir des servitudes naturelles et d'accomplir sa liberté, ou constitue-t-elle au contraire une contrainte asservissante ?";
-  } else if (/responsab/i.test(cleanSubjectNorm) && /homme|acte|tout ce qu/i.test(cleanSubjectNorm)) {
-    reformulation = "L'être humain doit-il assumer l'entière charge morale et juridique de ses actes, ou existe-t-il des déterminismes qui limitent sa responsabilité ?";
-  } else if (/bonheur/i.test(cleanSubjectNorm) && /mythe|illusion|chim[èe]re/i.test(cleanSubjectNorm)) {
-    reformulation = "Le bonheur durable est-il un rêve impossible et trompeur, ou un objectif que l'homme peut réellement atteindre ?";
-  } else if (/libert|libre/i.test(cleanSubjectNorm) && /mythe|illusion|chim[èe]re/i.test(cleanSubjectNorm)) {
-    reformulation = "La liberté de l'homme est-elle une simple illusion, ou l'homme a-t-il le pouvoir véritable de décider de ses actes ?";
-  } else if (/conscience/i.test(cleanSubjectNorm) && /inconscient/i.test(cleanSubjectNorm)) {
-    reformulation = "La conscience suffit-elle pour bien se connaître soi-même, ou est-elle limitée par les forces cachées de l'inconscient ?";
-  } else if (/etat/i.test(cleanSubjectNorm) && /libert|libre/i.test(cleanSubjectNorm)) {
-    reformulation = "L'État et ses lois diminuent-ils notre liberté, ou sont-ils la condition indispensable pour vivre libres et en sécurité ?";
-  } else if (/art/i.test(cleanSubjectNorm)) {
-    reformulation = "L'art a-t-il pour seul but de copier la nature ou de nous faire découvrir une beauté et une vérité plus profondes ?";
-  } else if (/justice/i.test(cleanSubjectNorm) || /droit/i.test(cleanSubjectNorm)) {
-    reformulation = "Être juste consiste-t-il seulement à obéir aux lois écrites de son pays, ou à respecter des valeurs morales plus hautes ?";
-  } else if (/histoire|historique/i.test(cleanSubjectNorm) && /imprevisible|previsib/i.test(cleanSubjectNorm)) {
-    reformulation = "Le surgissement des événements humains est-il voué au hasard et à l'imprévisibilité radicale, ou le cours de l'histoire obéit-il à des nécessités rationnelles intelligibles ?";
-  } else if (/religion|foi|dieu|croyance|croire/i.test(cleanSubjectNorm)) {
-    reformulation = "La foi religieuse répond-elle à une aspiration existentielle et morale légitime de l'homme, ou n'est-elle qu'une illusion dogmatique qui aliène sa raison ?";
-  } else if (/science|scientifique|theorie|experimentation/i.test(cleanSubjectNorm)) {
-    reformulation = "La science peut-elle prétendre à une vérité absolue et certaine, ou toute théorie scientifique demeure-t-elle provisoire et réfutable ?";
-  } else if (/technique|machine|technoscience/i.test(cleanSubjectNorm)) {
-    reformulation = "Le développement des techniques assure-t-il l'émancipation créatrice de l'humanité, ou engendre-t-il un asservissement inédit de l'homme ?";
-  } else if (/art|beau|beaute|artiste|esthetique/i.test(cleanSubjectNorm)) {
-    reformulation = "L'art se borne-t-il à une imitation superficielle du réel, ou constitue-t-il une voie privilégiée de dévoilement de la vérité sensible et de l'Idée ?";
-  } else if (/temps|duree|finitude/i.test(cleanSubjectNorm)) {
-    reformulation = "Le cours irréversible du temps condamne-t-il l'homme à l'angoisse de la finitude, ou représente-t-il la condition même de sa liberté et de son projet ?";
-  } else if (/culture|education|barbare|civilisation/i.test(cleanSubjectNorm)) {
-    reformulation = "L'accès à la culture humanise-t-il véritablement l'homme, ou la civilisation étouffe-t-elle sa liberté naturelle originelle ?";
-  } else if (/mort|mourir/i.test(cleanSubjectNorm)) {
-    reformulation = "La certitude inéluctable de la mort rend-elle l'existence absurde, ou donne-t-elle au contraire sa valeur et sa dignité à la vie présente ?";
-  } else {
-    const parsedSubject = parseAndAnalyzePhiloSubject(subjectExact);
-    reformulation = parsedSubject.reformulation;
-  }
+  // REFORMULATION UNIVERSELLE : conserver la proposition exacte du sujet.
+  const parsedSubjectCanonical = parseAndAnalyzePhiloSubject(subjectExact);
+  let reformulation = parsedSubjectCanonical.reformulation;
 
   // C. Problématisation du sujet
   // RÈGLE ABSOLUE : LE PROBLÈME DOIT OBLIGATOIREMENT ÊTRE UNE QUESTION CENTRALE DIRECTE.
@@ -910,69 +860,8 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
   // - JAMAIS d'affirmation ni de thèse comme problème
   // - JAMAIS de mot 'ou' dans le problème (les alternatives artificielles sont formellement proscrites)
   // - JAMAIS de confusion entre problème, reformulation, thèse et axes
-  let problemeCourt = "";
-  if (isPhiloExtinctionOrPasser) {
-    problemeCourt = "Peut-on se passer de la philosophie ?";
-  } else if (isPhiloMythe) {
-    problemeCourt = "La philosophie est-elle une vaine illusion ?";
-  } else if (isMytheRaison) {
-    problemeCourt = "Le mythe est-il véritablement aux antipodes de la raison ?";
-  } else if (matchedRelation) {
-    problemeCourt = matchedRelation.problemeCourt;
-  } else if (/travail/i.test(cleanSubjectNorm) && /libert|libre/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Le travail rend-il véritablement l'homme libre ?";
-  } else if (/responsab/i.test(cleanSubjectNorm) && /homme|acte|tout ce qu/i.test(cleanSubjectNorm)) {
-    problemeCourt = "L'homme est-il véritablement responsable de tous ses actes ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm) && /passer/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Peut-on réellement se passer de la philosophie ?";
-  } else if (/technique|progres/i.test(cleanSubjectNorm) && /bonheur/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Le progrès technique a-t-il un impact sur le bonheur ?";
-  } else if (/technique|machine/i.test(cleanSubjectNorm)) {
-    problemeCourt = "L’essor de la technique est-il toujours bénéfique à l’homme ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm) && /mythe|illusion|chim[èe]re/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La philosophie est-elle une vaine illusion ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm) && /inutile|inutilit[ée]/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La philosophie est-elle réellement utile à l'homme ?";
-  } else if (/philosophie|philosophe/i.test(cleanSubjectNorm)) {
-    problemeCourt = "L'homme a-t-il réellement besoin de la philosophie pour vivre ?";
-  } else if (/bonheur/i.test(cleanSubjectNorm) && /mythe|illusion|chim[èe]re/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Le bonheur est-il une vaine illusion ?";
-  } else if (/libert|libre/i.test(cleanSubjectNorm) && /mythe|illusion|chim[èe]re/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La liberté de l'homme est-elle une pure illusion ?";
-  } else if (/conscience/i.test(cleanSubjectNorm) && /suffit|suffire|definir|homme|essence|inconscient/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La conscience de soi suffit-elle à définir l'homme ?";
-  } else if (/conscience/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La conscience de soi permet-elle à l'homme d'accéder à la vérité ?";
-  } else if (/etat/i.test(cleanSubjectNorm) && /libert|libre/i.test(cleanSubjectNorm)) {
-    problemeCourt = "L’État a-t-il un impact négatif sur la liberté de l'homme ?";
-  } else if (/devoir\s+moral|notion\s+de\s+devoir|accomplir\s+(?:son|le)\s+devoir|morale/i.test(cleanSubjectNorm)) {
-    problemeCourt = "L'homme peut-il être heureux en accomplissant son devoir ?";
-  } else if (/justice/i.test(cleanSubjectNorm)) {
-    problemeCourt = "L'homme a-t-il toujours besoin de la justice pour vivre en société ?";
-  } else if (/verite/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Toute vérité a-t-elle réellement besoin d'être démontrée ?";
-  } else if (/bonheur/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Le bonheur est-il toujours accessible à l'homme ?";
-  } else if (/histoire|historique/i.test(cleanSubjectNorm) && /imprevisible|previsib/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Les événements historiques échappent-ils à toute prévisibilité ?";
-  } else if (/religion|foi|dieu|croyance|croire/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La religion est-elle une illusion pour l'homme ?";
-  } else if (/\b(?:science|scientifique|theorie|theories|experimentation)\b/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La science peut-elle prétendre à une vérité absolue ?";
-  } else if (/technique|machine|technoscience/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La technique constitue-t-elle un danger pour l'homme ?";
-  } else if (/art|beau|beaute|artiste|esthetique/i.test(cleanSubjectNorm)) {
-    problemeCourt = "L'art nous éloigne-t-il de la réalité ?";
-  } else if (/temps|duree|finitude/i.test(cleanSubjectNorm)) {
-    problemeCourt = "Le temps est-il un obstacle à la liberté humaine ?";
-  } else if (/culture|education|barbare|civilisation/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La culture dénature-t-elle l'homme ?";
-  } else if (/mort|mourir/i.test(cleanSubjectNorm)) {
-    problemeCourt = "La mort prive-t-elle la vie de tout sens ?";
-  } else {
-    const parsedSubject = parseAndAnalyzePhiloSubject(subjectExact);
-    problemeCourt = parsedSubject.problemeCourt;
-  }
+  // PROBLÉMATISATION UNIVERSELLE : la question exacte est la source de vérité.
+  let problemeCourt = parsedSubjectCanonical.problemeCourt;
 
   // GARDE-FOU UNIVERSEL DE FIDÉLITÉ AU SUJET
   const normalizeSubjectQuestion = (raw: string): string => {
@@ -1011,12 +900,8 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
     problemeCourt = problemeCourt.replace(/\s+ou\s+.*?\?/i, " ?");
   }
 
-  // OVERRIDE UNIVERSEL : uniquement en mode fallback générique sans correspondance fine
-  if (!matchedRelation) {
-    if (!problemeCourt || /L'homme a-t-il réellement besoin de la philosophie pour vivre \?/i.test(problemeCourt)) {
-      problemeCourt = subjectAsProblem(subjectExact);
-    }
-  }
+  // INVARIANT : aucune notion ni relation pré-enregistrée ne peut remplacer le sujet exact.
+  problemeCourt = parsedSubjectCanonical.problemeCourt;
 
   // Extraction du sujet direct pour l'Aspect 1 (commence par "dans quelle mesure [sujet] ?")
   const extractSubjectForAspect1 = (rawSubject: string): string => {
