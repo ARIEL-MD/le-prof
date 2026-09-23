@@ -1,46 +1,152 @@
 /**
- * Moteur International de Recherche de Cours & Savoir Officiel Universel
- * 
- * Ce moteur permet de répondre à TOUTE recherche de cours académique :
- * - Programmes Internationaux (Baccalauréat International IB, Cambridge A-Levels, AP Advanced Placement)
- * - Baccalauréats Francophones (France, Côte d'Ivoire, Sénégal, Maroc, Cameroun, etc.)
- * - Enseignement Supérieur, Classes Préparatoires et Grandes Écoles
- * - Savoirs scientifiques, littéraires, économiques, philosophiques et historiques
- * 
- * Stratégie de résolution :
- * 1. Moteur encyclopédique multilingue (Wikipédia FR + EN) enrichi avec extraction de formules et concepts.
- * 2. Générateur déterministe local international pour une disponibilité hors-ligne totale.
+ * Moteur universel de recherche éducative.
+ *
+ * Ce module ne définit pas une liste fermée de recherches possibles.
+ * Il sert de filet de sécurité pour toute requête qui n'a pas été résolue
+ * par les bases pédagogiques spécialisées de Le Prof.
+ *
+ * Principe : requête libre -> extraction du sujet -> recherche multi-source ->
+ * classement des candidats -> extraction de la partie de l'article la plus
+ * proche de la demande -> réponse pédagogique.
  */
 
-import { CourseSearchResult, CourseConceptFormula, CourseMethodStep } from '../src/types';
+import { CourseSearchResult, CourseConceptFormula } from '../src/types';
 import { findInternationalCourse } from '../src/data/internationalCoursesBase';
 
-/**
- * Nettoyage et normalisation de chaîne
- */
 function cleanQuery(str: string): string {
-  return (str || "").trim().replace(/\s+/g, " ");
+  return (str || '').trim().replace(/\s+/g, ' ');
+}
+
+export function isInternationalQuery(_query: string): boolean {
+  // Conservé pour compatibilité avec les appelants existants.
+  return true;
+}
+
+function normalize(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s'-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Mots grammaticaux très fréquents : ils ne doivent pas décider du sujet.
+// Ce n'est PAS une liste de types de recherche : elle sert uniquement à retirer
+// le bruit linguistique avant le classement des résultats.
+const STOP_WORDS = new Set([
+  'a','au','aux','avec','ce','ceci','cela','ces','cette','dans','de','des','du','en','et','est','etait','etre',
+  'il','ils','je','la','le','les','leur','leurs','ma','mais','me','mes','mon','ne','nos','notre','nous','on','ou',
+  'par','pas','pour','que','quel','quelle','quelles','quels','qui','quoi','sa','se','ses','son','sur','ta','te','tes',
+  'toi','ton','tous','tout','un','une','vos','votre','vous','y','d','l',
+  'donne','donner','donnez','moi','cherche','chercher','recherche','recherches','trouve','trouver','explique','expliquer',
+  'parle','parler','montre','montrer','faire','fais','fait','faire-moi','svp','stp','please'
+]);
+
+function tokens(value: string): string[] {
+  return normalize(value).split(/\s+/).filter(t => t.length >= 2 && !STOP_WORDS.has(t));
+}
+
+function subjectQuery(query: string): string {
+  const result = tokens(query);
+  return result.join(' ').trim() || normalize(query);
+}
+
+function rankHit(title: string, snippet: string, query: string, subject: string, index: number): number {
+  const t = normalize(title);
+  const s = normalize(snippet);
+  const q = tokens(query);
+  const st = tokens(subject);
+  let score = 0;
+
+  if (t === normalize(subject)) score += 150;
+  if (t === normalize(query)) score += 120;
+
+  for (const token of st) {
+    if (t.includes(token)) score += 35;
+    else if (s.includes(token)) score += 8;
+  }
+  for (const token of q) {
+    if (t.includes(token)) score += 10;
+    else if (s.includes(token)) score += 2;
+  }
+
+  if (t.includes('(homonymie)') || t.includes('(disambiguation)')) score -= 100;
+  return score - index * 0.25;
+}
+
+async function searchWikipediaCandidate(query: string, lang: 'fr' | 'en') {
+  const subject = subjectQuery(query);
+  const searches = Array.from(new Set([query, subject])).filter(Boolean);
+  const candidates: Array<{ title: string; score: number; lang: 'fr' | 'en' }> = [];
+
+  for (const search of searches) {
+    const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(search)}&srlimit=10&srprop=snippet&format=json&origin=*`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(5000) });
+    if (!res.ok) continue;
+    const data: any = await res.json();
+    const hits = Array.isArray(data?.query?.search) ? data.query.search : [];
+    hits.forEach((hit: any, index: number) => {
+      const title = String(hit?.title || '');
+      if (!title) return;
+      candidates.push({ title, score: rankHit(title, String(hit?.snippet || ''), query, subject, index), lang });
+    });
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  const best = candidates[0];
+  if (!best || best.score < 20) return null;
+
+  const summaryUrl = `https://${best.lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(best.title)}`;
+  const summaryRes = await fetch(summaryUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(5000) });
+  if (!summaryRes.ok) return null;
+  const summary: any = await summaryRes.json();
+  if (!summary?.extract || summary.type === 'disambiguation') return null;
+
+  return { title: String(summary.title || best.title), extract: String(summary.extract), description: String(summary.description || ''), url: String(summary.content_urls?.desktop?.page || ''), lang: best.lang, score: best.score };
 }
 
 /**
- * Détecte si une requête cible un programme ou standard international
+ * Cherche automatiquement une section pertinente sans connaître à l'avance
+ * le type de question. Les mots de la requête sont comparés aux titres des
+ * sections de l'article retenu. Ainsi une formulation nouvelle peut fonctionner
+ * sans être ajoutée à un dictionnaire « causes/conséquences/... ».
  */
-export function isInternationalQuery(query: string): boolean {
-  const q = query.toLowerCase();
-  return /\b(ib|international\s*baccalaureate|tok|theory\s*of\s*knowledge|th[ée]orie\s*de\s*la\s*connaissance|cambridge|a\s*levels?|as\s*level|igcse|ap\s|advanced\s*placement|international|mondial|mondialisation|universitaire|superieur|prepa|licence|master|sat|toefl|ielts|micro[ée]conomie|macro[ée]conomie|alg[èe]bre\s*lin[ée]aire|espaces?\s*vectoriels?|thermodynamique|carnot|m[ée]canique\s*quantique|droit\s*international|relations\s*internationales)\b/i.test(q);
+async function findBestSection(pageTitle: string, lang: 'fr' | 'en', query: string): Promise<{ heading: string; content: string } | null> {
+  try {
+    const sectionsUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=sections&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2`;
+    const sectionsRes = await fetch(sectionsUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(3500) });
+    if (!sectionsRes.ok) return null;
+    const data: any = await sectionsRes.json();
+    const sections = Array.isArray(data?.query?.pages?.[0]?.sections) ? data.query.pages[0].sections : [];
+    if (!sections.length) return null;
+
+    const pageTokens = new Set(tokens(pageTitle));
+    const requestTokens = tokens(query).filter(t => !pageTokens.has(t));
+    if (!requestTokens.length) return null;
+
+    const ranked = sections.map((section: any) => {
+      const heading = String(section?.line || '');
+      const headingTokens = tokens(heading);
+      const overlap = requestTokens.filter(t => headingTokens.includes(t) || normalize(heading).includes(t)).length;
+      return { section, heading, score: overlap * 30 - Number(section?.toclevel || 9) };
+    }).filter((x: any) => x.score > 0).sort((a: any, b: any) => b.score - a.score);
+
+    const best = ranked[0];
+    if (!best?.section?.index) return null;
+
+    const extractUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(pageTitle)}&format=json&formatversion=2&explaintext=1&section=${encodeURIComponent(String(best.section.index))}`;
+    const extractRes = await fetch(extractUrl, { headers: { 'User-Agent': 'LeProfAcademicEngine/3.0' }, signal: AbortSignal.timeout(3500) });
+    if (!extractRes.ok) return null;
+    const extractData: any = await extractRes.json();
+    const content = String(extractData?.query?.pages?.[0]?.extract || '').trim();
+    return content.length >= 80 ? { heading: best.heading, content } : null;
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Détecte si une requête est principalement en anglais
- */
-function isEnglishQuery(query: string): boolean {
-  const q = query.toLowerCase();
-  return /\b(the|and|of|in|for|with|theory|calculus|physics|chemistry|biology|economics|levels?|igcse|law|international|derivative|function)\b/i.test(q);
-}
-
-/**
- * Recherche et génère une fiche de cours internationale complète
- */
 export async function searchInternationalAcademicCourse(params: {
   query: string;
   discipline?: string;
@@ -50,221 +156,65 @@ export async function searchInternationalAcademicCourse(params: {
   const query = cleanQuery(params.query);
   if (!query) return null;
 
-  // 1. D'abord chercher dans la base officielle des cursus internationaux et supérieurs (IB, Cambridge, Supérieur, etc.)
+  // La base internationale garde la priorité lorsqu'elle possède une fiche exacte.
   const builtInMatch = findInternationalCourse(query);
-  if (builtInMatch) {
-    return builtInMatch;
-  }
+  if (builtInMatch) return builtInMatch;
 
-  // 2. Recherche Multilingue Wikipédia & Vikidia (FR + EN) avec extraction enrichie
-  return await searchMultiLingualEncyclopedia(query);
+  return searchMultiLingualEncyclopedia(query);
 }
 
-/**
- * Recherche encyclopédique multilingue (Wikipédia Français & Anglais) avec extraction enrichie
- */
 export async function searchMultiLingualEncyclopedia(query: string): Promise<CourseSearchResult | null> {
-  const cleanQ = query.trim();
+  const cleanQ = cleanQuery(query);
   if (!cleanQ) return null;
 
   try {
-    const isEn = isEnglishQuery(cleanQ);
-    const primaryLang = isEn ? 'en' : 'fr';
-    const secondaryLang = isEn ? 'fr' : 'en';
+    const isEnglish = /\b(the|and|of|in|for|with|what|why|how|define|explain|calculate|difference|between|physics|chemistry|biology|mathematics|history|literature)\b/i.test(cleanQ);
+    const languages: Array<'fr' | 'en'> = isEnglish ? ['en', 'fr'] : ['fr', 'en'];
+    const candidates = [];
 
-    // Tenter dans la langue primaire
-    let wikiData = await fetchWikipediaPage(cleanQ, primaryLang);
-    let langUsed = primaryLang;
-
-    // Si pas de résultat ou très court, tenter dans la langue secondaire
-    if (!wikiData || wikiData.extract.length < 150) {
-      const altData = await fetchWikipediaPage(cleanQ, secondaryLang);
-      if (altData && altData.extract.length > (wikiData?.extract?.length || 0)) {
-        wikiData = altData;
-        langUsed = secondaryLang;
-      }
+    for (const lang of languages) {
+      const candidate = await searchWikipediaCandidate(cleanQ, lang);
+      if (candidate) candidates.push(candidate);
     }
+    if (!candidates.length) return null;
 
-    if (!wikiData || !wikiData.title || wikiData.extract.length < 80) {
-      return null;
-    }
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    const targeted = await findBestSection(best.title, best.lang, cleanQ);
+    const content = targeted?.content || best.extract;
+    const heading = targeted?.heading || `Résultat : ${best.title}`;
+    const paragraphs = content.split(/\n+/).map(p => p.trim()).filter(p => p.length > 25);
 
-    const { title, extract, url } = wikiData;
-
-    // Découper l'extrait en paragraphes
-    const paragraphs = extract
-      .split(/\n+/)
-      .map(p => p.trim())
-      .filter(p => p.length > 30 && !p.startsWith("=="));
-
-    const intro = paragraphs.slice(0, 3).join("\n\n");
-    const remaining = paragraphs.slice(3);
-
-    // Extraire les concepts et définitions
-    const concepts: CourseConceptFormula[] = [];
-    
-    // Définition principale
-    concepts.push({
-      name: `Définition Fondamentale : ${title}`,
-      formulaOrRule: paragraphs[0] ? paragraphs[0].slice(0, 200) + (paragraphs[0].length > 200 ? '...' : '') : title,
-      explanation: paragraphs[1] || paragraphs[0] || `Présentation académique de ${title}.`,
-      contextOrApplication: "Fondement théorique indispensable pour toute étude du domaine."
-    });
-
-    // Concepts secondaires extraits des paragraphes suivants
-    for (let i = 0; i < Math.min(3, remaining.length); i++) {
-      const p = remaining[i];
-      const colonIdx = p.indexOf(':');
-      let cName = `Propriété clé #${i + 1}`;
-      let cRule = p;
-      if (colonIdx > 5 && colonIdx < 50) {
-        cName = p.slice(0, colonIdx).trim();
-        cRule = p.slice(colonIdx + 1).trim();
-      } else {
-        const firstDot = p.indexOf('.');
-        if (firstDot > 15 && firstDot < 80) {
-          cName = p.slice(0, firstDot).trim();
-          cRule = p.slice(firstDot + 1).trim();
-        }
-      }
-
-      concepts.push({
-        name: cName,
-        formulaOrRule: cRule.slice(0, 180) + (cRule.length > 180 ? '...' : ''),
-        explanation: p,
-        contextOrApplication: "Application directe dans les analyses et exercices de synthèse."
-      });
-    }
-
-    const result: CourseSearchResult = {
-      query: cleanQ,
-      discipline: 'philo',
-      disciplineLabel: 'Savoir Universel & Référentiel International',
-      cycle: 'second_cycle_bac',
-      level: 'terminale',
-      levelLabel: 'Terminale & International',
-      chapterTitle: title,
-      definitionAndScope: `Cadre encyclopédique officiel et étude théorique de « ${title} ».\n\n${intro}\n\nSource de référence : Encyclopédie Ouverte Internationale (${url}).`,
-      coreConceptsAndFormulas: concepts,
-      stepByStepMethod: [
-        {
-          stepNumber: 1,
-          title: "Définition précise des concepts",
-          whatToDo: `Définir « ${title} » avec ses termes techniques et son champ d'application.`,
-          reflexOrTip: "Ne pas confondre la notion avec ses acceptions populaires ou ambiguës."
-        },
-        {
-          stepNumber: 2,
-          title: "Mobilisation des principes et lois associés",
-          whatToDo: "Relier le concept aux théorèmes, contextes historiques ou principes fondateurs.",
-          reflexOrTip: "Citer les auteurs, chercheurs ou repères historiques canoniques."
-        },
-        {
-          stepNumber: 3,
-          title: "Analyse critique et mise en perspective",
-          whatToDo: "Confronter la thèse principale aux objections ou aux avancées contemporaines.",
-          reflexOrTip: "Toujours articuler l'explication autour de causes, mécanismes et conséquences."
-        }
-      ],
-      solvedExample: {
-        problemStatement: `Question de synthèse académique : En quoi l'étude de « ${title} » permet-elle d'éclairer les débats scientifiques et philosophiques contemporains ?`,
-        solutionStepByStep: `1. Définition du cadre conceptuel : ${paragraphs[0] || title}.\n2. Mécanismes d'analyse : mobiliser les propriétés fondamentales et expliciter leur portée.\n3. Conclusion rigoureuse synthétisant les enjeux majeurs.`,
-        finalAnswer: `Maîtrise validée du concept « ${title} » selon les critères d'excellence académique.`
-      },
-      classicExamTraps: [
-        `Réduire « ${title} » à une seule dimension sans examiner ses nuances`,
-        "Omettre de définir avec rigueur le vocabulaire technique associé",
-        "Confondre la cause du phénomène avec ses effets observables"
-      ],
-      selfCheckChecklist: [
-        `Je sais définir « ${title} » de manière autonome`,
-        "Je connais les principales propriétés et applications associées",
-        "Je suis capable d'éviter les contre-sens fréquents"
-      ],
-      quickRevisionMemo: `Mémo « ${title} » : Revoir la définition fondamentale et les applications clés résumées dans la fiche.`,
-      certificationNote: `Fiche de savoir certifiée - Référentiel Encyclopédique Universel (${langUsed === 'en' ? 'International / EN' : 'International / FR'} - 0 appel IA payant).`,
-      curriculumStandard: "Programme International (Savoir Encyclopédique Universel)",
-      isInternational: true
-    };
-
-    return result;
-  } catch (err) {
-    console.warn("Wikipedia multi-lingual search error:", err);
-    return null;
-  }
-}
-
-/**
- * Interroge l'API Wikipédia avec timeout sécurisé et sélection du meilleur candidat
- */
-async function fetchWikipediaPage(query: string, lang: 'fr' | 'en'): Promise<{ title: string; extract: string; url: string } | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5500);
-
-  try {
-    const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=5&format=json&origin=*`;
-    const searchRes = await fetch(searchUrl, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'LeProfAcademicEngine/2.0 (education@leprof.app)' }
-    });
-
-    if (!searchRes.ok) return null;
-    const searchData: any = await searchRes.json();
-    const hits: Array<{ title: string; snippet?: string }> = searchData?.query?.search || [];
-    if (hits.length === 0) return null;
-
-    // Évaluer et choisir le hit le plus pertinent pour un sujet académique
-    const qTokens = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-    let bestHit = hits[0];
-    let bestScore = -1;
-
-    for (const hit of hits) {
-      if (!hit.title) continue;
-      const lowerTitle = hit.title.toLowerCase();
-      // Pénaliser les pages d'homonymie
-      if (lowerTitle.includes('(homonymie)') || lowerTitle.includes('(disambiguation)')) {
-        continue;
-      }
-      let score = 0;
-      for (const token of qTokens) {
-        if (lowerTitle.includes(token)) score += 20;
-      }
-      if (lowerTitle === query.toLowerCase()) score += 50;
-      if (/\((?:mathématiques|physique|chimie|économie|philosophie|droit|science)\)/i.test(hit.title)) {
-        score += 15;
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        bestHit = hit;
-      }
-    }
-
-    const pageTitle = bestHit.title;
-    const pageUrl = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`;
-
-    const extractUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=0&explaintext=1&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`;
-    const extractRes = await fetch(extractUrl, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'LeProfAcademicEngine/2.0 (education@leprof.app)' }
-    });
-
-    if (!extractRes.ok) return null;
-    const extractData: any = await extractRes.json();
-    const pages = extractData?.query?.pages;
-    if (!pages) return null;
-
-    const firstPageKey = Object.keys(pages)[0];
-    const pageObj = pages[firstPageKey];
-    if (!pageObj || !pageObj.extract) return null;
+    const concepts: CourseConceptFormula[] = paragraphs.slice(0, 5).map((p, index) => ({
+      name: index === 0 ? heading : `Information ${index + 1}`,
+      formulaOrRule: p.slice(0, 500),
+      explanation: p,
+      contextOrApplication: `Information récupérée pour répondre directement à la requête « ${cleanQ} ».`
+    }));
 
     return {
-      title: pageObj.title || pageTitle,
-      extract: pageObj.extract,
-      url: pageUrl
+      query: cleanQ,
+      discipline: 'philo',
+      disciplineLabel: 'Recherche éducative universelle',
+      cycle: 'second_cycle_bac',
+      level: 'terminale',
+      levelLabel: 'Tous niveaux & enseignement supérieur',
+      chapterTitle: targeted ? `${targeted.heading} — ${best.title}` : best.title,
+      definitionAndScope: content,
+      coreConceptsAndFormulas: concepts,
+      stepByStepMethod: [],
+      solvedExample: { problemStatement: '', solutionStepByStep: '', finalAnswer: '' },
+      classicExamTraps: [],
+      selfCheckChecklist: [],
+      quickRevisionMemo: paragraphs.slice(0, 2).join(' '),
+      certificationNote: `Source encyclopédique externe : Wikipédia ${best.lang.toUpperCase()}. Le résultat a été sélectionné par correspondance de la requête et du sujet, sans réponse inventée.`,
+      curriculumStandard: 'Recherche éducative universelle',
+      isInternational: true,
+      directContent: content,
+      isDirectAnswer: true
     };
-  } catch (e) {
+  } catch (err) {
+    console.warn('Universal educational search error:', err);
     return null;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
