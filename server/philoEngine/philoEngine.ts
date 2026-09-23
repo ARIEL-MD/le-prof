@@ -80,7 +80,7 @@ const NOTION_KEYWORDS: Record<string, NotionKeywordWeights> = {
     weak: [/\bloi\b/, /pouvoir politique/, /desordre/, /\bviolence\b/, /\bsociete\b/],
   },
   "la-philosophie-utilite": {
-    strong: [/\bphilosophie\b/, /\bphilosophe\b/, /vivre sans philosopher/, /utilite de la philosophie/, /philosophie.*(?:mythe|illusion|chim[èe]re|inutile|inutilit[ée]|bavardage|sp[ée]culat)/, /[aà]\s+quoi\s+sert\s+la\s+philosophie/, /\bmythe\s+et\s+raison\b/, /\bmythe.*raison\b/, /\braison.*mythe\b/],
+    strong: [/\bphilosoph(?:ie|e|er|ons|ant)\b/, /vivre sans philosopher/, /utilite de la philosophie/, /philosophie.*(?:mythe|illusion|chim[èe]re|inutile|inutilit[ée]|bavardage|sp[ée]culat)/, /[aà]\s+quoi\s+sert\s+la\s+philosophie/, /\bmythe\s+et\s+raison\b/, /\bmythe.*raison\b/, /\braison.*mythe\b/],
     weak: [/\bsagesse\b/, /speculat/, /\binutile\b/, /\bmythe\b/, /\braison\b/],
   },
   "art-et-travail": {
