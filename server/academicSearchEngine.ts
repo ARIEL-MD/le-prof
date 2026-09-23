@@ -4610,7 +4610,10 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
 
   // 6.ter Recherche sémantique multi-pistes dans les corpus locaux extensibles.
   const semanticFallback = await searchLocalSemanticFallback(rawQuery, params.level, params.discipline, params.serie);
-  if (semanticFallback && semanticCandidateScore(semanticFallback, rawQuery) >= 12 && isSearchResultRelevant(semanticFallback, rawQuery)) {
+  const semanticTokens = buildSemanticSearchVariants(rawQuery)[1]?.split(/\s+/).filter(t => t.length >= 3) || [];
+  const semanticTitle = normalizeString(semanticFallback?.chapterTitle || '');
+  const semanticStrongMatch = semanticFallback && semanticTokens.length >= 2 && semanticTokens.filter(t => semanticTitle.includes(t)).length >= 1;
+  if (semanticStrongMatch && semanticCandidateScore(semanticFallback!, rawQuery) >= 12 && isSearchResultRelevant(semanticFallback!, rawQuery)) {
     saveToCache(cacheKey, semanticFallback);
     return semanticFallback;
   }
