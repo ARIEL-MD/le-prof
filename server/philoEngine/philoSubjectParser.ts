@@ -99,7 +99,7 @@ function buildOpposingQuestion(subject: string): string {
     return "Toutefois, la réponse initiale ne doit-elle pas être nuancée ?";
   }
   const selected = anchors.slice(0, 3).join(" et ");
-  return `Toutefois, les termes « ${selected} » ne conduisent-ils pas à nuancer la réponse initiale ?`;
+  return `Toutefois, les termes ${selected} ne conduisent-ils pas à nuancer la réponse initiale ?`;
 }
 
 function buildReformulation(subject: string, modal: PhiloModalType): string {
@@ -125,7 +125,7 @@ export function parseAndAnalyzePhiloSubject(rawSubject: string): ParsedSubjectAn
   // The exact question is canonical. Every downstream stage can recover it verbatim.
   const problemeCourt = exact;
   const subjectWithoutMeasure = clean.replace(/^(?:dans\s+quelle\s+mesure|jusqu['’]à\s+quel\s+point|en\s+quoi)\s+/i, "").trim();
-  const aspect1 = `Dans quelle mesure la réponse directe à « ${subjectWithoutMeasure} » est-elle défendable ?`;
+  const aspect1 = `Dans quelle mesure la réponse directe à ${subjectWithoutMeasure} est-elle défendable ?`;
   const aspect2 = buildOpposingQuestion(clean);
   const reformulation = buildReformulation(clean, modal);
 
