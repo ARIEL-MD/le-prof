@@ -95,11 +95,11 @@ function extractAnchors(subject: string): string[] {
 
 function buildOpposingQuestion(subject: string): string {
   const anchors = extractAnchors(subject);
-  const quoted = `« ${subject} »`;
   if (!anchors.length) {
-    return `Quelles raisons permettent de défendre une réponse opposée ou de nuancer la réponse première à la question ${quoted} ?`;
+    return "Toutefois, la réponse initiale ne doit-elle pas être nuancée ?";
   }
-  return `Si l'on défend d'abord une réponse à ${quoted}, quelles objections fondées sur les mêmes termes et sur leur relation obligent à la nuancer ou à la dépasser ?`;
+  const selected = anchors.slice(0, 3).join(" et ");
+  return `Toutefois, les termes « ${selected} » ne conduisent-ils pas à nuancer la réponse initiale ?`;
 }
 
 function buildReformulation(subject: string, modal: PhiloModalType): string {
