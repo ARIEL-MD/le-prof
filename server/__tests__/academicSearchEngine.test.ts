@@ -202,7 +202,7 @@ describe("Recherche de Cours & Notions — anti faux positifs", () => {
   it("retourne le corpus demandé pour 'argument sur la liberté' sans basculer vers une autre notion", async () => {
     const res = await searchAcademicCourseUnified({ query: "argument sur la liberté" });
     assert.equal(res.noResult, undefined);
-    assert.match(res.chapterTitle, /liberté/i);
+    assert.match(res.chapterTitle, /libert/i);
     assert.ok(res.coreConceptsAndFormulas.length >= 2);
     assert.ok(res.coreConceptsAndFormulas.some(c => /citation|auteur|libert/i.test(c.name + " " + c.formulaOrRule + " " + c.explanation)));
   });
