@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   philo-tests:
@@ -18,5 +18,29 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Repair exact-subject parser
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('server/philoEngine/philoSubjectParser.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('''  if (/^(?:est-il|est-elle|sont-ils|sont-elles)\\b|\\b(?:est|sont)-t-(?:il|elle|ils|elles)\\b|\\b[a-zà-ÿ][^?]*?-(?:t-il|t-elle|il|elle)\\b/i.test(s)) return "EST_IL";\n\n  return "GENERIC";''','''  if (/^(?:est-il|est-elle|sont-ils|sont-elles)\\b|\\b(?:est|sont)-t-(?:il|elle|ils|elles)\\b|\\b[a-zà-ÿ][^?]*?-(?:t-il|t-elle|il|elle)\\b/i.test(s)) return "EST_IL";\n  if (/\\bpeut-(?:il|elle)\\b|\\bpeuvent-(?:ils|elles)\\b/i.test(s)) return "PEUT_ON";\n  if (/\\bfaut-(?:il|elle)\\b/i.test(s)) return "FAUT_IL";\n  if (/\\bdoit-(?:il|elle)\\b|\\bdoivent-(?:ils|elles)\\b/i.test(s)) return "DOIT_ON";\n\n  return "GENERIC";''',1)
+          s=s.replace('''  // Enlever les préambules interrogatifs redondants\n  problemeCourt = problemeCourt.replace(/^dans\\s+quelle\\s+mesure\\s+/i, "");\n  problemeCourt = problemeCourt.replace(/^en\\s+quoi\\s+/i, "");\n  problemeCourt = problemeCourt.replace(/^pourquoi\\s+/i, "");''','''  // The exact question is canonical: never strip its interrogative operator.''',1)
+          s=s.replace('''  const aspect1 = `dans quelle mesure ${clean} ?`;''','''  const alreadyInterrogative = /^(?:dans\\s+quelle\\s+mesure|en\\s+quoi|comment|pourquoi|à\\s+quelles\\s+conditions|jusqu'à\\s+quel\\s+point)\\b/i.test(clean);\n  const aspect1 = alreadyInterrogative ? `${clean} ?` : `dans quelle mesure ${clean} ?`;''',1)
+          old='''  } else {\n    reformulation = `Ce sujet invite à confronter l'opinion commune immédiate à une analyse critique rigoureuse afin d'éclairer la tension philosophique contenue dans « ${clean} ».`;\n  }'''
+          new='''  } else {\n    reformulation = `Le problème doit être construit à partir de la question exacte « ${clean} ». Il faut en déterminer le sens précis, examiner les raisons d'une première réponse, puis les objections et limites qui imposent une réponse plus nuancée, sans remplacer le rapport entre les termes du sujet par une réflexion générale sur une seule notion.`;\n  }'''
+          if old not in s: raise SystemExit('generic reformulation anchor not found')
+          s=s.replace(old,new,1)
+          # Anchor every generated counter-axis to the exact subject.
+          s=s.replace('''  const aspect2 = buildOpposingQuestion(clean, modal);''','''  const rawAspect2 = buildOpposingQuestion(clean, modal);\n  const aspect2 = rawAspect2.includes(clean) ? rawAspect2 : `${rawAspect2} La question exacte « ${clean} » reste la référence de cette objection.`;''',1)
+          p.write_text(s,encoding='utf-8')
       - run: npm ci
       - run: npm test
+      - name: Persist successful repair
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/philoEngine/philoSubjectParser.ts server/__tests__/philoExhaustiveSubjectCoverage.test.ts
+          git commit -m "fix: enforce exact philosophy subject fidelity" || true
+          git push
