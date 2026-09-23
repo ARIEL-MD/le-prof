@@ -2810,19 +2810,33 @@ function buildConjugationSearchResult(query: string, rawQuery: string): CourseSe
  * Une requête de définition/propriété/formule ne doit jamais être transformée
  * en fiche de cours complète.
  */
-function getTargetedSearchIntent(query: string): 'definition' | 'formula' | 'statement' | 'full_course' | 'general' {
+function getTargetedSearchIntent(query: string):
+  | 'definition' | 'formula' | 'statement' | 'full_course' | 'general'
+  | 'causes' | 'consequences' | 'manifestations' | 'acteurs' | 'dates'
+  | 'caracteristiques' | 'role' | 'objectifs' | 'principes' | 'organes'
+  | 'limites' | 'atouts' | 'etapes' | 'mecanisme' | 'exemples' {
   const q = normalizeString(query);
-
-  if (/\b(cours\s+(?:complet|d[ée]taill[ée])|chapitre|le[cç]on|tout\s+sur|fiche\s+de\s+r[ée]vision)\b/i.test(q)) {
-    return 'full_course';
-  }
-  if (/\b(formule|formules|[ée]quation|[ée]quations|expression)\b/i.test(q)) return 'formula';
-  if (/\b(d[ée]finition|d[ée]finir|qu[’\']est[- ]ce que|c[’\']est quoi|signification)\b/i.test(q)) return 'definition';
-  if (/\b(propri[ée]t[ée]|propri[ée]t[ée]s|th[ée]or[èe]me|th[ée]or[èe]mes|loi|r[èe]gle|[ée]nonc[ée])\b/i.test(q)) return 'statement';
-
+  if (/\b(cours\s+(?:complet|detaille)|chapitre|lecon|tout\s+sur|fiche\s+de\s+revision)\b/i.test(q)) return 'full_course';
+  if (/\b(formule|formules|equation|equations|expression)\b/i.test(q)) return 'formula';
+  if (/\b(definition|definir|qu['’]?est[- ]ce que|c['’]?est quoi|signification)\b/i.test(q)) return 'definition';
+  if (/\b(propriete|proprietes|theoreme|theoremes|loi|regle|enonce)\b/i.test(q)) return 'statement';
+  if (/\b(causes?|origines?|facteurs?|raisons?|pourquoi|genese|declencheur)\b/i.test(q)) return 'causes';
+  if (/\b(consequences?|effets?|impact|resultats?|bilan|retombees?)\b/i.test(q)) return 'consequences';
+  if (/\b(manifestations?|deroulement|faits?|actions?|evenements?|phases?)\b/i.test(q)) return 'manifestations';
+  if (/\b(acteurs?|personnages?|protagonistes?|participants?|pays\s+impliques?)\b/i.test(q)) return 'acteurs';
+  if (/\b(dates?|chronologie|chronologique|annees?|periodes?|reperes?)\b/i.test(q)) return 'dates';
+  if (/\b(caracteristiques?|traits?|particularites?)\b/i.test(q)) return 'caracteristiques';
+  if (/\b(role|importance|utilite|fonction)\b/i.test(q)) return 'role';
+  if (/\b(objectifs?|buts?|missions?)\b/i.test(q)) return 'objectifs';
+  if (/\b(principes?|fondements?|bases?|regles?)\b/i.test(q)) return 'principes';
+  if (/\b(organes?|structures?|institutions?)\b/i.test(q)) return 'organes';
+  if (/\b(limites?|faiblesses?|inconvenients?|desavantages?|critiques?)\b/i.test(q)) return 'limites';
+  if (/\b(avantages?|atouts?|forces?|benefices?)\b/i.test(q)) return 'atouts';
+  if (/\b(etapes?|phases?|evolution|deroulement|developpement)\b/i.test(q)) return 'etapes';
+  if (/\b(mecanisme|fonctionnement|processus)\b/i.test(q)) return 'mecanisme';
+  if (/\b(exemples?|illustrations?|cas\s+concrets?|applications?)\b/i.test(q)) return 'exemples';
   return 'general';
 }
-
 function normalizeSearchTokens(text: string): string[] {
   return normalizeString(text)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -3605,6 +3619,26 @@ Concept forgé par Nikita Khrouchtchev au XXe congrès du PCUS (1956), affirmant
 • La rupture doctrinale de 1947 : Doctrine Truman (endiguement) et Plan Marshall d'un côté, face à la Doctrine Jdanov et au Kominform de l'autre.`;
     }
 
+    // Facettes générales : traiter la demande précise avant la fiche générique.
+    if (isCauses) {
+      return 'LES CAUSES DE LA GUERRE FROIDE (1947-1991)\n\n' +
+        '1. LE CONTEXTE DE L\'APRÈS-GUERRE :\n• L’Europe sort affaiblie de la Seconde Guerre mondiale et le rapport de forces se déplace vers les États-Unis et l’URSS.\n• La disparition de l’ennemi commun nazi fait réapparaître les divergences politiques, économiques et idéologiques entre les anciens alliés.\n\n' +
+        '2. L’OPPOSITION IDÉOLOGIQUE ET POLITIQUE :\n• Les États-Unis défendent le modèle libéral et capitaliste tandis que l’URSS cherche à étendre et sécuriser son modèle communiste en Europe orientale.\n• La méfiance réciproque s’aggrave autour de la question allemande et de l’organisation de l’Europe.\n\n' +
+        '3. LA RUPTURE DE 1947 :\n• La doctrine Truman du 12 mars 1947 affirme la politique d’endiguement du communisme.\n• Le plan Marshall de juin 1947 propose une aide économique à l’Europe, refusée par l’URSS et ses alliés.\n• La doctrine Jdanov et la création du Kominform en 1947 structurent la réponse soviétique.\n\n' +
+        '4. LA DIVISION DE L’EUROPE :\n• La mise en place de gouvernements communistes en Europe de l’Est et la consolidation des deux zones d’influence contribuent à la bipolarisation.\n• Le « rideau de fer » symbolise cette séparation progressive entre les deux blocs.';
+    }
+    if (isConsequences) {
+      return 'LES CONSÉQUENCES DE LA GUERRE FROIDE (1947-1991)\n\n' +
+        '1. LA BIPOLARISATION DU MONDE :\n• Le monde se structure autour de deux blocs dirigés par les États-Unis et l’URSS.\n• Des alliances militaires, économiques et politiques consolident ces deux ensembles.\n\n' +
+        '2. LES CRISES ET CONFLITS INDIRECTS :\n• Des crises majeures éclatent à Berlin, en Corée, à Cuba et ailleurs, sans affrontement militaire direct généralisé entre les deux superpuissances.\n• La course aux armements nucléaires et la dissuasion deviennent centrales.\n\n' +
+        '3. LA FIN DE LA BIPOLARISATION :\n• La chute du mur de Berlin en 1989 et les transformations politiques en Europe de l’Est précèdent la disparition de l’URSS en 1991.\n• La disparition de l’URSS marque la fin de l’ordre bipolaire issu de la Guerre froide.';
+    }
+    if (/\b(acteurs?|personnages?|protagonistes?|participants?|pays\s+impliques?)\b/i.test(qClean)) {
+      return 'LES ACTEURS DE LA GUERRE FROIDE (1947-1991)\n\n1. LES DEUX SUPERPUISSANCES :\n• Les États-Unis dirigent le bloc occidental.\n• L’URSS dirige le bloc oriental.\n\n2. LES ALLIÉS ET ORGANISATIONS :\n• Le camp occidental s’appuie notamment sur l’OTAN et ses alliés.\n• Le camp oriental s’organise autour de l’URSS et du Pacte de Varsovie.\n\n3. AUTRES ACTEURS :\n• La Chine, les pays non alignés et les États engagés dans les conflits périphériques jouent des rôles variables selon les périodes.\n• L’ONU constitue une importante enceinte diplomatique.';
+    }
+    if (/\b(dates?|chronologie|chronologique|annees?|periodes?|reperes?)\b/i.test(qClean)) {
+      return 'DATES ET CHRONOLOGIE DE LA GUERRE FROIDE (1947-1991)\n\n• 1947 : doctrines Truman et Jdanov, création du Kominform.\n• 1948-1949 : première crise et blocus de Berlin.\n• 1949 : création de l’OTAN et du COMECON ; l’URSS acquiert l’arme nucléaire.\n• 1950-1953 : guerre de Corée.\n• 1955 : Pacte de Varsovie.\n• 1961 : construction du mur de Berlin.\n• 1962 : crise des missiles de Cuba.\n• Années 1970 : détente.\n• 1989 : chute du mur de Berlin.\n• 1991 : disparition de l’URSS et fin de la Guerre froide.';
+    }
     return `LA GUERRE FROIDE (1947-1991)
 
 1. DÉFINITION & CARACTÉRISTIQUES :
