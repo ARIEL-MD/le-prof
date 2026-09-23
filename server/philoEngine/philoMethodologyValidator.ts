@@ -770,6 +770,24 @@ export function validateAndEnforcePhiloMethodology(
   const comp = { ...components };
   const checks: PhiloValidationCheckResult[] = [];
 
+  // EXACT-SUBJECT-CONCLUSION-GUARD
+  // A conclusion is not allowed to answer a nearby notion instead of the
+  // exact question. Keep several meaningful words from the original subject
+  // present in the final answer and remove generic canned conclusions.
+  const subjectWords = comp.subjectExact
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length >= 5)
+    .filter(w => !/^(quelle|quelles|quels|comment|pourquoi|peut|peut-on|doit|doit-on|faut|faut-il|dans|quelle|mesure|homme|hommes|est|sont|etre|être)$/i.test(w));
+  const conclusionText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.toLowerCase();
+  const conclusionHits = subjectWords.filter(w => conclusionText.includes(w)).length;
+  if (subjectWords.length > 0 && conclusionHits < Math.min(2, subjectWords.length)) {
+    comp.reponseDefinitive = `Au terme de notre réflexion, la question « ${comp.subjectExact} » ne peut donc pas être remplacée par une réflexion générale sur une seule notion. La réponse doit porter précisément sur le rapport posé entre les termes du sujet.`;
+    comp.conclusionFullText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.trim();
+  }
+
   // ==========================================================================
   // DISTINCTION STRICTE ENTRE "LIMITER" ET "EXCLURE"
   // ==========================================================================
