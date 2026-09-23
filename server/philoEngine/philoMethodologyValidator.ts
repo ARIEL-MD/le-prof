@@ -873,7 +873,7 @@ export function validateAndEnforcePhiloMethodology(
     check2Action = "Suppression de l'alternative artificielle « ou » au profit d'une question directe unifiée.";
   }
 
-  if (!/^(?:peut-on|faut-il|doit-on|est-il|est-elle|est-ce|en quoi|dans quelle mesure|pourquoi|l'homme|l'idée|la|le|les|l'|qui|qu'|que|comment)\b/i.test(p)) {
+  if (!/^(?:peut-on|faut-il|doit-on|est-il|est-elle|est-ce|en quoi|dans quelle mesure|pourquoi|l'homme|l'idée|la|le|les|l['’]|qui|qu['’]|que|comment)\b/i.test(p)) {
     p = p.replace(/\s*\?*$/, "");
     p = `Dans quelle mesure ${p.charAt(0).toLowerCase() + p.slice(1)} ?`;
     check2Passed = false;
