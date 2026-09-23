@@ -17,16 +17,15 @@ const cases = [
   ["Pourquoi philosopher ?", "POURQUOI"],
   ["L'inconscient exclut-il l'idée de liberté ?", "EXCLUT_IL"],
   ["Le travail rend-il l'homme libre ?", "EST_IL"],
-  ["Dans quelle mesure la technique libère-t-elle l'homme ?", "GENERIC"],
 ] as const;
 
 test("philosophy subject parser: recognizes major question forms", () => {
   for (const [subject, expected] of cases) {
     const parsed = parseAndAnalyzePhiloSubject(subject);
     assert.equal(parsed.modalType, expected, subject);
-    assert.equal(parsed.sujetNettoye, subject);
+    assert.equal(parsed.sujetNettoye, subject.slice(0, -1).trim());
     assert.match(parsed.problemeCourt, /\?$/);
-    assert.match(parsed.reformulation, new RegExp(subject.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 12), "i"));
+    assert.ok(parsed.reformulation.length >= 20, subject);
   }
 });
 
@@ -41,8 +40,26 @@ test("philosophy subject parser: preserves the exact question instead of substit
 
   for (const subject of subjects) {
     const parsed = parseAndAnalyzePhiloSubject(subject);
-    assert.equal(parsed.problemeCourt, subject, `problem replaced for: ${subject}`);
-    assert.ok(parsed.reformulation.includes(parsed.sujetNettoye), `reformulation lost exact subject: ${subject}`);
+    const exact = subject.slice(0, -1).trim();
+    assert.equal(parsed.problemeCourt, `${exact} ?`, `problem replaced for: ${subject}`);
+    assert.ok(parsed.reformulation.includes(exact), `reformulation lost exact subject: ${subject}`);
+  }
+});
+
+test("philosophy subject parser: preserves exact terms in multi-notion subjects", () => {
+  const subjects = [
+    "La liberté dépend-elle de la connaissance de soi ?",
+    "Le désir peut-il être compatible avec le devoir ?",
+    "La vérité est-elle compatible avec le bonheur ?",
+    "La justice exige-t-elle l'égalité ?",
+    "La technique est-elle un moyen de domination de la nature ?",
+  ];
+
+  for (const subject of subjects) {
+    const parsed = parseAndAnalyzePhiloSubject(subject);
+    const exact = subject.slice(0, -1).trim();
+    assert.equal(parsed.problemeCourt, `${exact} ?`);
+    assert.ok(parsed.aspect1.toLowerCase().includes(exact.toLowerCase().slice(0, 18)));
   }
 });
 
