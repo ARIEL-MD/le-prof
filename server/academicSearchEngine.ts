@@ -4104,6 +4104,42 @@ PRINCIPES Son action repose sur :
   return undefined;
 }
 
+/** Recherche sémantique locale multi-pistes : requête complète + noyau lexical + paires de termes, puis classement des candidats. */
+function buildSemanticSearchVariants(rawQuery: string): string[] {
+  const normalized = normalizeString(rawQuery).trim();
+  const stopWords = new Set(['donne','donner','donnez','moi','svp','stp','merci','cherche','recherche','trouve','trouver','explique','expliquer','parle','parler','cours','fiche','notion','definition','definir','signification','argument','arguments','citation','citations','exemple','exemples','present','présent','conjugaison','conjuguer','temps','mode','forme','formes','sur','pour','avec','dans','de','du','des','la','le','les','un','une','au','aux','en','et','ou','ce','cette','ces','qui','est','sont','que','quoi','comment','pourquoi','peut','peuvent','faut','doit','doivent','est-il','est-ce','a','à','d','l']);
+  const tokens = normalized.split(/\s+/).filter(t => t.length >= 3 && !stopWords.has(t));
+  const variants: string[] = [rawQuery.trim()];
+  if (tokens.length) variants.push(tokens.join(' '));
+  for (let i = 0; i < tokens.length - 1; i++) variants.push(tokens[i] + ' ' + tokens[i + 1]);
+  if (tokens.length > 3) variants.push(tokens.slice(0, 3).join(' '));
+  return [...new Set(variants.filter(Boolean))].slice(0, 8);
+}
+
+function semanticCandidateScore(result: CourseSearchResult, rawQuery: string): number {
+  if (!result || result.noResult) return -Infinity;
+  const norm = (v: string) => normalizeString(v);
+  const q = norm(rawQuery);
+  const qTokens = q.split(/\s+/).filter(t => t.length >= 3);
+  const title = norm(result.chapterTitle || '');
+  const body = norm([result.chapterTitle || '', result.definitionAndScope || '', result.directContent || '', result.quickRevisionMemo || '', ...(result.coreConceptsAndFormulas || []).slice(0, 30).flatMap(c => [c.name || '', c.formulaOrRule || '', c.explanation || '', c.contextOrApplication || ''])].join(' '));
+  const bodyTokens = new Set(body.split(/\s+/));
+  let score = q.length >= 5 && title.includes(q) ? 100 : 0;
+  for (const token of qTokens) { if (new Set(title.split(/\s+/)).has(token)) score += 12; else if (bodyTokens.has(token)) score += 7; else if (body.includes(token)) score += 2; }
+  if (result.isDirectAnswer) score += 8;
+  return score;
+}
+
+async function searchLocalSemanticFallback(rawQuery: string, level?: SecondaryLevel, discipline?: DisciplineType, serie?: AcademicSerie): Promise<CourseSearchResult | null> {
+  const candidates: CourseSearchResult[] = [];
+  for (const variant of buildSemanticSearchVariants(rawQuery)) {
+    try { const result = getAcademicCourseResult(variant, level, discipline, serie); if (result && !result.noResult) candidates.push(result); } catch { /* une source défaillante ne bloque pas les autres */ }
+  }
+  if (!candidates.length) return null;
+  const unique = [...new Map(candidates.map(r => [r.chapterTitle + '|' + r.discipline, r])).values()];
+  unique.sort((a, b) => semanticCandidateScore(b, rawQuery) - semanticCandidateScore(a, rawQuery));
+  return unique[0] || null;
+}
 async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams): Promise<CourseSearchResult> {
   const rawQuery = (params.query || "").trim();
   const cleanQuery = normalizeString(rawQuery);
@@ -4572,6 +4608,12 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
     return internationalCourse;
   }
 
+  // 6.ter Recherche sémantique multi-pistes dans les corpus locaux extensibles.
+  const semanticFallback = await searchLocalSemanticFallback(rawQuery, params.level, params.discipline, params.serie);
+  if (semanticFallback && isSearchResultRelevant(semanticFallback, rawQuery)) {
+    saveToCache(cacheKey, semanticFallback);
+    return semanticFallback;
+  }
   // 6.bis Recherche Encyclopédique Gratuite et Ouverte (Vikidia & Wikipédia - 100% sans IA)
   const encyclopediaResult = await searchFreeEncyclopedia(rawQuery);
   if (encyclopediaResult) {
