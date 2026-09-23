@@ -4609,3 +4609,41 @@ function saveToCache(key: string, result: CourseSearchResult) {
   }
   searchCache.set(key, result);
 }
+
+
+/** Barrière de pertinence universelle : bloque les fiches voisines qui ne traitent pas réellement la requête. */
+function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): boolean {
+  if (result.noResult) return true;
+  const normalize = (value: string) => normalizeString(value)
+    .replace(/\b(?:donne|donner|donnez|moi|please|svp|stp|merci|cherche|recherche|trouve|trouver|explique|expliquer|parle|parler|sur|pour|de|du|des|d|la|le|les|un|une|au|aux|en|et|ou|avec|dans|ce|cette|ces|qui|est|sont|que|quoi|comment|pourquoi|peut|peuvent|faut|doit|doivent|est-il|est-ce|cours|complet|detaille|fiche|notion|definition|definir|signification|argument|arguments|citation|citations|these|antithese|exemple|exemples|conjugaison|conjuguer|temps|mode|forme|formes)\b/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+  const coreTokens = normalize(rawQuery).split(/\s+/).filter(t => t.length >= 3);
+  if (coreTokens.length === 0) return false;
+  const title = normalize(result.chapterTitle || '');
+  const resultQuery = normalize(result.query || '');
+  const body = normalize([result.definitionAndScope || '', result.directContent || '', result.quickRevisionMemo || '', ...(result.coreConceptsAndFormulas || []).slice(0, 20).flatMap(c => [c.name || '', c.formulaOrRule || '', c.explanation || '', c.contextOrApplication || ''])].join(' '));
+  const escaped = (token: string) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const has = (text: string, token: string) => new RegExp('\\b' + escaped(token) + '\\b', 'i').test(text);
+  let titleHits = 0, bodyHits = 0, queryHits = 0;
+  for (const token of coreTokens) { if (has(title, token)) titleHits++; if (has(body, token)) bodyHits++; if (has(resultQuery, token)) queryHits++; }
+  if (coreTokens.every(token => has(title, token))) return true;
+  if (coreTokens.length === 1) return titleHits >= 1 || queryHits >= 1;
+  if (titleHits >= 1 && (bodyHits + queryHits) >= 2) return true;
+  if (titleHits >= 2) return true;
+  return (bodyHits + queryHits) >= Math.min(3, coreTokens.length);
+}
+
+export async function searchAcademicCourseUnified(params: AcademicSearchParams): Promise<CourseSearchResult> {
+  const result = await searchAcademicCourseUnifiedInternal(params);
+  if (isSearchResultRelevant(result, params.query || '')) return result;
+  return {
+    query: (params.query || '').trim(),
+    discipline: params.discipline || 'philo',
+    disciplineLabel: params.discipline ? String(params.discipline) : 'Recherche académique',
+    cycle: 'second_cycle_bac', level: params.level || 'terminale', levelLabel: params.level || 'Tous niveaux',
+    chapterTitle: 'Aucun résultat pertinent',
+    definitionAndScope: `Aucune fiche suffisamment pertinente n'a été trouvée pour « ${(params.query || '').trim()} ».`,
+    coreConceptsAndFormulas: [], stepByStepMethod: [], solvedExample: { problemStatement: '', solutionStepByStep: '', finalAnswer: '' },
+    classicExamTraps: [], selfCheckChecklist: [], quickRevisionMemo: '', certificationNote: '', noResult: true
+  };
+}
