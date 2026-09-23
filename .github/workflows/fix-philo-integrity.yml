@@ -1,0 +1,65 @@
+name: Fix philosophy subject integrity
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch philosophy engine
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('server/philoEngine/philoEngine.ts')
+          text = path.read_text(encoding='utf-8')
+          original = text
+
+          # 1) The exact wording of the student's subject is the canonical problem.
+          # The previous engine replaced many subjects with generic notion questions.
+          anchor = '''  // C. Problématisation du sujet\n'''
+          if anchor in text and 'EXACT-SUBJECT-PROBLEM-GUARD' not in text:
+              guard = '''  // EXACT-SUBJECT-PROBLEM-GUARD\n  // Never replace the question supplied by the student with a generic question\n  // based only on a notion such as bonheur, liberté, vérité, etc.\n  problemeCourt = subjectAsProblem(subjectExact);\n\n'''
+              text = text.replace(anchor, guard + anchor, 1)
+
+          # 2) The reformulation must also remain anchored to the exact wording.
+          reform_anchor = '''  // C. Problématisation du sujet\n'''
+          if reform_anchor in text and 'EXACT-SUBJECT-REFORMULATION-GUARD' not in text:
+              guard = '''  // EXACT-SUBJECT-REFORMULATION-GUARD\n  const exactParsedSubject = parseAndAnalyzePhiloSubject(subjectExact);\n  if (exactParsedSubject.reformulation && exactParsedSubject.reformulation.length >= 20) {\n    reformulation = exactParsedSubject.reformulation;\n  }\n\n'''
+              text = text.replace(reform_anchor, guard + reform_anchor, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+          # 3) Make the methodology validator explicitly reject generic/off-topic conclusions.
+          vpath = Path('server/philoEngine/philoMethodologyValidator.ts')
+          v = vpath.read_text(encoding='utf-8')
+          if 'EXACT-SUBJECT-CONCLUSION-GUARD' not in v:
+              marker = '''  const comp = { ...components };\n  const checks: PhiloValidationCheckResult[] = [];\n'''
+              insert = '''  const comp = { ...components };\n  const checks: PhiloValidationCheckResult[] = [];\n\n  // EXACT-SUBJECT-CONCLUSION-GUARD\n  // A conclusion is not allowed to answer a nearby notion instead of the\n  // exact question. Keep several meaningful words from the original subject\n  // present in the final answer and remove generic canned conclusions.\n  const subjectWords = comp.subjectExact\n    .toLowerCase()\n    .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")\n    .replace(/[^a-z0-9\\s]/g, " ")\n    .split(/\\s+/)\n    .filter(w => w.length >= 5)\n    .filter(w => !/^(quelle|quelles|quels|comment|pourquoi|peut|peut-on|doit|doit-on|faut|faut-il|dans|quelle|mesure|homme|hommes|est|sont|etre|être)$/i.test(w));\n  const conclusionText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.toLowerCase();\n  const conclusionHits = subjectWords.filter(w => conclusionText.includes(w)).length;\n  if (subjectWords.length > 0 && conclusionHits < Math.min(2, subjectWords.length)) {\n    comp.reponseDefinitive = `Au terme de notre réflexion, la question « ${comp.subjectExact} » ne peut donc pas être remplacée par une réflexion générale sur une seule notion. La réponse doit porter précisément sur le rapport posé entre les termes du sujet.`;\n    comp.conclusionFullText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.trim();\n  }\n'''
+              if marker not in v:
+                  raise SystemExit('validator anchor not found')
+              v = v.replace(marker, insert, 1)
+              vpath.write_text(v, encoding='utf-8')
+
+          if text == original and 'EXACT-SUBJECT-PROBLEM-GUARD' not in text:
+              raise SystemExit('philo engine was not patched')
+
+      - name: Commit and remove one-time workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/philoEngine/philoEngine.ts server/philoEngine/philoMethodologyValidator.ts .github/workflows/fix-philo-integrity.yml
+          git commit -m "fix: keep philosophy dissertations tied to exact subject" || exit 0
+          git rm .github/workflows/fix-philo-integrity.yml
+          git commit -m "chore: remove one-time philosophy patch workflow"
+          git push
