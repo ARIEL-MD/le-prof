@@ -4638,6 +4638,27 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
 export async function searchAcademicCourseUnified(params: AcademicSearchParams): Promise<CourseSearchResult> {
   const result = await searchAcademicCourseUnifiedInternal(params);
   if (isSearchResultRelevant(result, params.query || '')) return result;
+
+  // Dernier recours sémantique : uniquement après rejet des sources spécialisées.
+  const rawQuery = (params.query || '').trim();
+  if (!/\b\d{6,}\b/.test(normalizeString(rawQuery))) {
+    const variants = buildSemanticSearchVariants(rawQuery);
+    const candidates: CourseSearchResult[] = [];
+    for (const variant of variants) {
+      try {
+        const candidate = getAcademicCourseResult(variant, params.level, params.discipline, params.serie);
+        if (candidate && !candidate.noResult) candidates.push(candidate);
+      } catch { /* une source défaillante ne bloque pas la recherche */ }
+    }
+    const tokens = variants[1]?.split(/\s+/).filter(t => t.length >= 3) || [];
+    const unique = [...new Map(candidates.map(r => [r.chapterTitle + '|' + r.discipline, r])).values()];
+    unique.sort((a, b) => semanticCandidateScore(b, rawQuery) - semanticCandidateScore(a, rawQuery));
+    const winner = unique.find(candidate => {
+      const title = normalizeString(candidate.chapterTitle || '');
+      return tokens.length === 1 ? title.includes(tokens[0]) : tokens.length > 1 && tokens.every(t => title.includes(t));
+    });
+    if (winner && isSearchResultRelevant(winner, rawQuery)) return winner;
+  }
   return {
     query: (params.query || '').trim(),
     discipline: params.discipline || 'philo',
