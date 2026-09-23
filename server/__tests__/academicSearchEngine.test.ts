@@ -196,7 +196,7 @@ describe("Recherche de Cours & Notions — anti faux positifs", () => {
     assert.equal(res.noResult, undefined);
     assert.match(res.chapterTitle, /manger/i);
     assert.match(res.directContent || "", /TEMPS DEMANDÉ.*PRÉSENT/i);
-    assert.match(res.directContent || "", /je\\s+\*?mange/i);
+    assert.match(res.directContent || "", /je\s+\*?mange/i);
   });
 
   it("retourne le corpus demandé pour 'argument sur la liberté' sans basculer vers une autre notion", async () => {
