@@ -4629,18 +4629,6 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
     return encyclopediaResult;
   }
 
-  // 6.ter Recherche sémantique multi-pistes dans les corpus locaux extensibles.
-  const hasSuspiciousIdentifier = /\b\d{6,}\b/.test(normalizeString(rawQuery));
-  const semanticDiscipline = params.discipline || inferSemanticDiscipline(rawQuery);
-  const semanticFallback = hasSuspiciousIdentifier ? null : await searchLocalSemanticFallback(rawQuery, params.level, semanticDiscipline, params.serie);
-  const semanticTokens = buildSemanticSearchVariants(rawQuery)[1]?.split(/\s+/).filter(t => t.length >= 3) || [];
-  const semanticTitle = normalizeString(semanticFallback?.chapterTitle || '');
-  const semanticStrongMatch = semanticFallback && semanticTokens.length >= 2 && semanticTokens.filter(t => semanticTitle.includes(t)).length >= 2;
-  if (semanticStrongMatch && semanticCandidateScore(semanticFallback!, rawQuery) >= 12 && isSearchResultRelevant(semanticFallback!, rawQuery)) {
-    saveToCache(cacheKey, semanticFallback);
-    return semanticFallback;
-  }
-
   // 7. Aucun résultat suffisamment fiable : ne jamais fabriquer une fiche générique.
   const noResult: CourseSearchResult = {
     query: rawQuery,
@@ -4702,6 +4690,25 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
 export async function searchAcademicCourseUnified(params: AcademicSearchParams): Promise<CourseSearchResult> {
   const result = await searchAcademicCourseUnifiedInternal(params);
   if (isSearchResultRelevant(result, params.query || '')) return result;
+
+  // Dernier niveau : recherche sémantique seulement après épuisement/rejet
+  // des sources spécialisées, afin de ne jamais voler un résultat officiel.
+  if (result.noResult) {
+    const rawQuery = (params.query || '').trim();
+    const hasSuspiciousIdentifier = /\b\d{6,}\b/.test(normalizeString(rawQuery));
+    if (!hasSuspiciousIdentifier) {
+      const semanticDiscipline = params.discipline || inferSemanticDiscipline(rawQuery);
+      const semanticFallback = await searchLocalSemanticFallback(rawQuery, params.level, semanticDiscipline, params.serie);
+      const semanticTokens = buildSemanticSearchVariants(rawQuery)[1]?.split(/\s+/).filter(t => t.length >= 3) || [];
+      const semanticTitle = normalizeString(semanticFallback?.chapterTitle || '');
+      const semanticStrongMatch = semanticFallback && semanticTokens.length >= 2 && semanticTokens.filter(t => semanticTitle.includes(t)).length >= 2;
+      if (semanticStrongMatch && semanticCandidateScore(semanticFallback!, rawQuery) >= 12 && isSearchResultRelevant(semanticFallback, rawQuery)) {
+        saveToCache(`${normalizeString(rawQuery)}_semantic`, semanticFallback);
+        return semanticFallback;
+      }
+    }
+  }
+
   return {
     query: (params.query || '').trim(),
     discipline: params.discipline || 'philo',
