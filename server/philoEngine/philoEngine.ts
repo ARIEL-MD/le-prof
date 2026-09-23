@@ -417,16 +417,10 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
   // MOTEUR LOCAL DETERMINISTE SANS IA : Recherche dans la base des relations et concepts philosophiques
   const matchedRelation = findMatchingPhiloRelation(subjectExact);
 
-  // Si aucun mot-clé philosophique n'a matché du tout et aucune relation fine n'a matché,
-  // vérifier si des termes conceptuels d'interrogation philosophique existent avant de refuser
-  if (!matchedRelation && (!best || best.score === 0)) {
-    if (!/\b(philosoph|penser|pens[ée]e|cogito|m[ée]taphysique|[ée]pist[ée]molog|aporie|doute|douter|savoir|v[ée]rit|morale?|raison)\b/i.test(clean)) {
-      return {
-        success: false,
-        classification: { notionId: "", notionName: "", confidence: 0 },
-      };
-    }
-  }
+  // MOTEUR PHILOSOPHIQUE OUVERT : l'absence de correspondance dans le lexique
+  // ne signifie pas que le sujet n'est pas philosophique. Un sujet inédit,
+  // affirmatif ou formulé de manière atypique doit quand même être traité.
+  // La confiance reste basse lorsqu'aucun appariement n'est disponible.
 
   let matchedNotion = best && best.score > 0 ? best.notion : (
     matchedRelation ? (philosophieTleKnowledgeBase.notions.find(n => n.name.toLowerCase().includes(matchedRelation.concept1.toLowerCase())) || philosophieTleKnowledgeBase.notions[0]) : philosophieTleKnowledgeBase.notions[0]
