@@ -2184,8 +2184,10 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
   if (!cleanTerm || cleanTerm.length < 2) return null;
 
   try {
-    // 1. D'abord chercher l'article le plus pertinent via l'API de recherche Wikipédia (en français)
-    const searchUrl = `https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanTerm)}&format=json&utf8=1&srlimit=1`;
+    // 1. Recherche large : on demande plusieurs candidats à Wikipédia au lieu
+    // de prendre aveuglément le premier résultat. Cela réduit fortement les faux positifs
+    // pour les requêtes inédites et permet au moteur de comparer les titres au sujet demandé.
+    const searchUrl = `https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanTerm)}&format=json&utf8=1&srlimit=10&srprop=snippet|sectiontitle`;
     const searchRes = await fetch(searchUrl, {
       headers: { "User-Agent": "LeProfEducationBot/1.0 (contact@leprof.ci)" },
       signal: AbortSignal.timeout(3500)
@@ -2193,10 +2195,34 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
 
     if (!searchRes.ok) return null;
     const searchData: any = await searchRes.json();
-    const hit = searchData?.query?.search?.[0];
-    const pageTitle = hit?.title || cleanTerm;
+    const hits = Array.isArray(searchData?.query?.search) ? searchData.query.search : [];
+    if (!hits.length) return null;
 
-    // 2. Récupérer le résumé officiel et certifié de la page
+    const normalize = (value: string) => value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\\u0300-\\u036f]/g, "")
+      .replace(/[^a-z0-9\\s-]/g, " ")
+      .replace(/\\s+/g, " ")
+      .trim();
+
+    const topicTokens = normalize(cleanTerm).split(" ").filter((token: string) => token.length >= 3);
+    const rankedHits = hits.map((hit: any, index: number) => {
+      const titleNorm = normalize(String(hit?.title || ""));
+      const snippetNorm = normalize(String(hit?.snippet || ""));
+      const titleMatches = topicTokens.filter((token: string) => titleNorm.includes(token)).length;
+      const snippetMatches = topicTokens.filter((token: string) => snippetNorm.includes(token)).length;
+      const exactTitle = titleNorm === normalize(cleanTerm) ? 100 : 0;
+      const allTitleTokens = topicTokens.length > 0 && topicTokens.every((token: string) => titleNorm.includes(token));
+      return {
+        title: String(hit?.title || ""),
+        score: exactTitle + titleMatches * 15 + (allTitleTokens ? 35 : 0) + snippetMatches * 3 - index * 0.5
+      };
+    }).sort((a: any, b: any) => b.score - a.score);
+
+    const pageTitle = rankedHits[0]?.title || String(hits[0]?.title || cleanTerm);
+
+    // 2. Récupérer le résumé de la page retenue.
     const summaryUrl = `https://fr.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`;
     const summaryRes = await fetch(summaryUrl, {
       headers: { "User-Agent": "LeProfEducationBot/1.0 (contact@leprof.ci)" },
@@ -2381,7 +2407,7 @@ async function searchFreeEncyclopedia(query: string): Promise<CourseSearchResult
         "Êtes-vous capable d'illustrer cette notion par un exemple concret ?"
       ],
       quickRevisionMemo: `Mémo express : Pour « ${title} », retenir l'idée maîtresse : ${sentences[0] || extract.slice(0, 150) + "..."}`,
-      certificationNote: `Fiche de savoir certifiée issue des ressources éducatives libres et encyclopédiques vérifiées (0 appel IA).`
+      certificationNote: `Source encyclopédique externe consultée dynamiquement ; le contenu doit être recoupé avec les cours et sources pédagogiques officielles lorsque l'enjeu est évaluatif ou sensible.`
     };
   } catch (error) {
     // Si Wikipédia n'est pas accessible, on continue vers le fallback local garanti
