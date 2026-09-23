@@ -4635,6 +4635,22 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
   return bodyHits >= Math.min(3, coreTokens.length);
 }
 
+function buildSemanticSearchVariants(rawQuery: string): string[] {
+  const stop = new Set(['donne','donner','donnez','moi','svp','stp','merci','cherche','recherche','trouve','trouver','explique','expliquer','cours','fiche','notion','definition','definir','signification','argument','arguments','citation','citations','exemple','exemples','sur','pour','avec','dans','de','du','des','la','le','les','un','une','au','aux','en','et','ou','ce','cette','ces','qui','est','sont','que','quoi','comment','pourquoi','peut','peuvent','faut','doit','doivent']);
+  const tokens = normalizeString(rawQuery).split(/\s+/).filter(t => t.length >= 3 && !stop.has(t));
+  const variants = [rawQuery.trim(), tokens.join(' ')];
+  for (let i = 0; i < tokens.length - 1; i++) variants.push(tokens[i] + ' ' + tokens[i + 1]);
+  return [...new Set(variants.filter(Boolean))].slice(0, 8);
+}
+
+function semanticCandidateScore(result: CourseSearchResult, rawQuery: string): number {
+  const q = normalizeString(rawQuery);
+  const title = normalizeString(result.chapterTitle || '');
+  const tokens = q.split(/\s+/).filter(t => t.length >= 3);
+  let score = title === q ? 100 : title.includes(q) ? 60 : 0;
+  for (const token of tokens) { if (title.includes(token)) score += 12; else if (normalizeString(result.definitionAndScope || '').includes(token)) score += 2; }
+  return score;
+}
 export async function searchAcademicCourseUnified(params: AcademicSearchParams): Promise<CourseSearchResult> {
   const result = await searchAcademicCourseUnifiedInternal(params);
   if (isSearchResultRelevant(result, params.query || '')) return result;
