@@ -4605,7 +4605,7 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
       directContent,
       fullCourseContent: strictOfficialCourse.fullCourseContent ? cleanNoClassOrExamLabels(strictOfficialCourse.fullCourseContent) : undefined,
       isDirectAnswer: Boolean(directContent),
-      definitionAndScope: cleanNoClassOrExamLabels((strictOfficialCourse.definitions || []).slice(0, 4).map(d => `• **${d.term}** : ${d.definition}`).join('\n\n') || strictOfficialCourse.quickMemo),
+      definitionAndScope: directContent || cleanNoClassOrExamLabels((strictOfficialCourse.definitions || []).slice(0, 4).map(d => `• **${d.term}** : ${d.definition}`).join('\n\n') || strictOfficialCourse.quickMemo),
       coreConceptsAndFormulas: [
         ...(strictOfficialCourse.definitions || []).map(d => ({ name: cleanNoClassOrExamLabels(d.term), formulaOrRule: cleanNoClassOrExamLabels(d.definition), explanation: '', contextOrApplication: '' })),
         ...(strictOfficialCourse.formulas || []).map(f => ({ name: cleanNoClassOrExamLabels(f.name), formulaOrRule: cleanNoClassOrExamLabels(f.formula), explanation: cleanNoClassOrExamLabels(f.explanation || ''), contextOrApplication: cleanNoClassOrExamLabels(f.unitOrCondition || '') })),
@@ -4833,7 +4833,7 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
       directContent,
       fullCourseContent: officialCourse.fullCourseContent ? cleanNoClassOrExamLabels(officialCourse.fullCourseContent) : undefined,
       isDirectAnswer,
-      definitionAndScope: cleanScope,
+      definitionAndScope: directContent || cleanScope,
       coreConceptsAndFormulas: [
         ...(officialCourse.definitions || []).map(d => ({
           name: cleanNoClassOrExamLabels(d.term),
