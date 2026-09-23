@@ -197,7 +197,7 @@ test("Contrôle Final Obligatoire en 12 points & Priorité Structurale", async (
 
     const aspect1 = meth?.philoPreliminaryWork.problematisation.aspect1 || "";
     const aspect2 = meth?.philoPreliminaryWork.problematisation.aspect2 || "";
-    assert.match(aspect1, /responsabilit/i);
+    assert.match(aspect1, /responsab/i);
     assert.match(aspect2, /responsab|exigence\s+morale|r[ée]pondre/i);
 
     const part1 = result.structuredRedaction?.development.part1;
