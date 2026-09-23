@@ -1587,13 +1587,13 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
 
   // 3. CONCLUSION EN 3 TEMPS — ancrée sur le sujet exact.
   const bilanSynthese =
-    `Au terme de notre analyse, la question « ${subjectExact} » montre que la première réponse doit être confrontée à ses limites et à ses conditions de validité.`;
+    `Au terme de notre analyse, la question ${subjectExact} montre que la première réponse doit être confrontée à ses limites et à ses conditions de validité.`;
 
   const reponseDefinitive =
-    `Toutefois, la réponse à « ${subjectExact} » doit tenir ensemble l'argument initial et l'objection qui le met à l'épreuve, sans remplacer la relation posée par le sujet par une réflexion sur une notion isolée.`;
+    `Toutefois, la réponse à ${subjectExact} doit tenir ensemble l'argument initial et l'objection qui le met à l'épreuve, sans remplacer la relation posée par le sujet par une réflexion sur une notion isolée.`;
 
   const elargissement =
-    `En définitive, l'enjeu de « ${subjectExact} » est de déterminer les conditions dans lesquelles les termes de la question peuvent être pensés ensemble sans les confondre ni les opposer artificiellement.`;
+    `En définitive, l'enjeu de ${subjectExact} est de déterminer les conditions dans lesquelles les termes de la question peuvent être pensés ensemble sans les confondre ni les opposer artificiellement.`;
 
   const conclusionFullText = `${bilanSynthese} ${reponseDefinitive} ${elargissement}`;
 
