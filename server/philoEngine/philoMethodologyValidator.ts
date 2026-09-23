@@ -858,26 +858,41 @@ export function validateAndEnforcePhiloMethodology(
   let check2Action: string | undefined = undefined;
 
   let p = comp.problemeCourt.trim();
-  if (!p.endsWith("?")) {
-    p = `${p} ?`;
-    check2Passed = false;
-    check2Action = "Ajout de la ponctuation interrogative obligatoire.";
-  }
+  const exactProblem = comp.subjectExact.trim().replace(/[?？]+$/, "").trim() + " ?";
+  const normalizeProblem = (value: string) => value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[’']/g, "'")
+    .replace(/\\s+/g, " ")
+    .trim();
 
-  if (/\b\s+ou\s+\b/i.test(p)) {
-    check2Passed = false;
-    const parts = p.split(/\b\s+ou\s+\b/i);
-    let firstPart = parts[0].trim();
-    if (!firstPart.endsWith("?")) firstPart += " ?";
-    p = firstPart;
-    check2Action = "Suppression de l'alternative artificielle « ou » au profit d'une question directe unifiée.";
-  }
+  // SOURCE DE VÉRITÉ : si le problème est déjà le sujet exact, aucune règle
+  // stylistique ne doit le transformer en une question voisine.
+  if (normalizeProblem(p) === normalizeProblem(exactProblem)) {
+    p = exactProblem;
+  } else {
+    if (!p.endsWith("?")) {
+      p = `${p} ?`;
+      check2Passed = false;
+      check2Action = "Ajout de la ponctuation interrogative obligatoire.";
+    }
 
-  if (!/^(?:peut-on|faut-il|doit-on|est-il|est-elle|est-ce|en quoi|dans quelle mesure|pourquoi|l'homme|l'idée|la|le|les|l['’]|qui|qu['’]|que|comment)\b/i.test(p)) {
-    p = p.replace(/\s*\?*$/, "");
-    p = `Dans quelle mesure ${p.charAt(0).toLowerCase() + p.slice(1)} ?`;
-    check2Passed = false;
-    check2Action = "Transformation de la formule en question interrogative philosophique.";
+    if (/\\b\\s+ou\\s+\\b/i.test(p)) {
+      check2Passed = false;
+      const parts = p.split(/\\b\\s+ou\\s+\\b/i);
+      let firstPart = parts[0].trim();
+      if (!firstPart.endsWith("?")) firstPart += " ?";
+      p = firstPart;
+      check2Action = "Suppression de l'alternative artificielle « ou » au profit d'une question directe unifiée.";
+    }
+
+    if (!/^(?:peut-on|faut-il|doit-on|est-il|est-elle|est-ce|en quoi|dans quelle mesure|pourquoi|l'homme|l'idée|la|le|les|l['’]|qui|qu['’]|que|comment)\\b/i.test(p)) {
+      p = p.replace(/\\s*\\?*$/, "");
+      p = `Dans quelle mesure ${p.charAt(0).toLowerCase() + p.slice(1)} ?`;
+      check2Passed = false;
+      check2Action = "Transformation de la formule en question interrogative philosophique.";
+    }
   }
 
   comp.problemeCourt = p;
