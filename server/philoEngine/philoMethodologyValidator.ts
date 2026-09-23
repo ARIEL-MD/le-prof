@@ -862,9 +862,9 @@ export function validateAndEnforcePhiloMethodology(
   const normalizeProblem = (value: string) => value
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[’']/g, "'")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 
   // SOURCE DE VÉRITÉ : si le problème est déjà le sujet exact, aucune règle
@@ -878,17 +878,17 @@ export function validateAndEnforcePhiloMethodology(
       check2Action = "Ajout de la ponctuation interrogative obligatoire.";
     }
 
-    if (/\\b\\s+ou\\s+\\b/i.test(p)) {
+    if (/\b\s+ou\s+\b/i.test(p)) {
       check2Passed = false;
-      const parts = p.split(/\\b\\s+ou\\s+\\b/i);
+      const parts = p.split(/\b\s+ou\s+\b/i);
       let firstPart = parts[0].trim();
       if (!firstPart.endsWith("?")) firstPart += " ?";
       p = firstPart;
       check2Action = "Suppression de l'alternative artificielle « ou » au profit d'une question directe unifiée.";
     }
 
-    if (!/^(?:peut-on|faut-il|doit-on|est-il|est-elle|est-ce|en quoi|dans quelle mesure|pourquoi|l'homme|l'idée|la|le|les|l['’]|qui|qu['’]|que|comment)\\b/i.test(p)) {
-      p = p.replace(/\\s*\\?*$/, "");
+    if (!/^(?:peut-on|faut-il|doit-on|est-il|est-elle|est-ce|en quoi|dans quelle mesure|pourquoi|l'homme|l'idée|la|le|les|l['’]|qui|qu['’]|que|comment)\b/i.test(p)) {
+      p = p.replace(/\s*\?*$/, "");
       p = `Dans quelle mesure ${p.charAt(0).toLowerCase() + p.slice(1)} ?`;
       check2Passed = false;
       check2Action = "Transformation de la formule en question interrogative philosophique.";
@@ -1200,11 +1200,11 @@ export function validateAndEnforcePhiloMethodology(
   const conclusionNorm = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "");
   const exactAnchors = comp.subjectExact
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\\s]/g, " ")
     .split(/\\s+/)
     .filter(w => w.length >= 5)
