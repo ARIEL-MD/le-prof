@@ -784,7 +784,7 @@ export function validateAndEnforcePhiloMethodology(
   const conclusionText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.toLowerCase();
   const conclusionHits = subjectWords.filter(w => conclusionText.includes(w)).length;
   if (subjectWords.length > 0 && conclusionHits < Math.min(2, subjectWords.length)) {
-    comp.reponseDefinitive = `Au terme de notre réflexion, la question « ${comp.subjectExact} » ne peut donc pas être remplacée par une réflexion générale sur une seule notion. La réponse doit porter précisément sur le rapport posé entre les termes du sujet.`;
+    comp.reponseDefinitive = `Au terme de notre réflexion, la question ${comp.subjectExact} ne peut donc pas être remplacée par une réflexion générale sur une seule notion. La réponse doit porter précisément sur le rapport posé entre les termes du sujet.`;
     comp.conclusionFullText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.trim();
   }
 
@@ -1196,7 +1196,7 @@ export function validateAndEnforcePhiloMethodology(
     .filter(w => !/^(quelle|quelles|quels|comment|pourquoi|peut|peut-on|doit|doit-on|faut|faut-il|dans|mesure|homme|hommes|est|sont|etre)$/i.test(w));
   const missingAnchors = exactAnchors.filter(w => !conclusionNorm.includes(w));
   if (missingAnchors.length > 0) {
-    comp.reponseDefinitive = `Toutefois, la réponse à la question « ${comp.subjectExact} » doit rester centrée sur le rapport exact entre les termes du sujet et sur les limites de chaque réponse.`;
+    comp.reponseDefinitive = `Toutefois, la réponse à la question ${comp.subjectExact} doit rester centrée sur le rapport exact entre les termes du sujet et sur les limites de chaque réponse.`;
     comp.conclusionFullText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.trim();
   }
 
