@@ -4740,6 +4740,33 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
 
     if (searchIntent === 'full_course') {
       directContent = undefined;
+    } else {
+      // Le titre doit refléter explicitement la facette demandée.
+      // Ainsi « causes de X » ne ressemble jamais à une simple fiche générale « X ».
+      const facetTitle: Record<string, string> = {
+        causes: 'Causes & Origines',
+        consequences: 'Conséquences & Bilan',
+        manifestations: 'Manifestations & Déroulement',
+        acteurs: 'Acteurs & Parties prenantes',
+        dates: 'Dates & Chronologie',
+        caracteristiques: 'Caractéristiques',
+        role: 'Rôle & Importance',
+        objectifs: 'Objectifs & Missions',
+        principes: 'Principes & Fondements',
+        organes: 'Organes & Structures',
+        limites: 'Limites & Critiques',
+        atouts: 'Avantages & Atouts',
+        formules: 'Formules & Relations',
+        definitions: 'Définition',
+        etapes: 'Étapes & Évolution',
+        mecanisme: 'Mécanisme & Fonctionnement',
+        exemples: 'Exemples & Applications',
+        general: 'Synthèse'
+      };
+      const facetLabel = facetTitle[searchIntent];
+      if (facetLabel && !new RegExp(facetLabel.split(' & ')[0], 'i').test(cleanChapterTitle)) {
+        cleanChapterTitle = `${facetLabel} : ${cleanChapterTitle}`;
+      }
     }
 
     // Cadrage pédagogique professionnel (objectifs officiels et définitions claires, sans puces de cours brut I. II.)
