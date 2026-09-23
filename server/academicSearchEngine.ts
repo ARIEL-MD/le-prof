@@ -2066,13 +2066,27 @@ export function extractCleanSearchTopic(rawQuery: string): { topic: string; inte
     .replace(/\bargumant\b/gi, "argument");
 
   let intent = "CONCEPT";
-  if (/^(?:qui\s+(?:est|etait|sont|fus|fut)|c['’]est\s+qui|biographie|vie\s+et\s+oeuvre)/i.test(cleaned) || /auteur|philosophe|penseur|savant|figure/i.test(cleaned)) {
+  if (/^(?:qui\s+(?:est|etait|sont|fus|fut)|c['’]est\s+qui|biographie|vie\s+et\s+oeuvre)/i.test(cleaned) || /\b(?:auteur|philosophe|penseur|savant|figure)\b/i.test(cleaned)) {
     intent = "AUTHOR";
-  } else if (/argument|these|antithese|justifi|pour et contre/i.test(cleaned)) intent = "ARGUMENT";
-  else if (/citation|qui a dit|proverbe|phrase/i.test(cleaned)) intent = "CITATION";
-  else if (/difference|compar|distinction|vs/i.test(cleaned)) intent = "COMPARISON";
-  else if (/comment|methode|plan|technique|etapes|rediger/i.test(cleaned)) intent = "METHOD";
-  else if (/formule|theoreme|calcul|loi de|relation/i.test(cleaned)) intent = "FORMULA";
+  } else if (/\b(?:argument|arguments|these|antithese|justifi|objection|pour et contre)\b/i.test(cleaned)) intent = "ARGUMENT";
+  else if (/\b(?:citation|citations|qui a dit|proverbe|phrase)\b/i.test(cleaned)) intent = "CITATION";
+  else if (/\b(?:difference|compar|distinction|vs|versus)\b/i.test(cleaned)) intent = "COMPARISON";
+  else if (/\b(?:comment|methode|méthode|plan|technique|etapes|étapes|rediger|rédiger)\b/i.test(cleaned)) intent = "METHOD";
+  else if (/\b(?:formule|formules|theoreme|théorème|calcul|loi de|relation|equation|équation)\b/i.test(cleaned)) intent = "FORMULA";
+  else if (/\b(?:causes?|origines?|facteurs?|raisons?|pourquoi|genese|genèse|declencheur|déclencheur)\b/i.test(cleaned)) intent = "CAUSES";
+  else if (/\b(?:consequences?|conséquences?|effets?|impact|resultats?|résultats?|bilan|retombees?|retombées?)\b/i.test(cleaned)) intent = "CONSEQUENCES";
+  else if (/\b(?:acteurs?|personnages?|protagonistes?|participants?|pays\s+impliques?|pays\s+impliqués?)\b/i.test(cleaned)) intent = "ACTORS";
+  else if (/\b(?:dates?|chronologie|chronologique|annees?|années?|periodes?|périodes?|reperes?|repères?)\b/i.test(cleaned)) intent = "DATES";
+  else if (/\b(?:definition|définition|definir|définir|qu['’]est[- ]ce|c['’]est\s+quoi|signification|sens)\b/i.test(cleaned)) intent = "DEFINITION";
+  else if (/\b(?:caracteristiques?|caractéristiques?|traits?|particularites?|particularités?)\b/i.test(cleaned)) intent = "CHARACTERISTICS";
+  else if (/\b(?:role|rôle|importance|utilite|utilité|fonction)\b/i.test(cleaned)) intent = "ROLE";
+  else if (/\b(?:objectifs?|buts?|missions?)\b/i.test(cleaned)) intent = "OBJECTIVES";
+  else if (/\b(?:principes?|fondements?|bases?|regles?|règles?)\b/i.test(cleaned)) intent = "PRINCIPLES";
+  else if (/\b(?:limites?|faiblesses?|inconvenients?|inconvénients?|desavantages?|désavantages?)\b/i.test(cleaned)) intent = "LIMITS";
+  else if (/\b(?:avantages?|atouts?|forces?|benefices?|bénéfices?)\b/i.test(cleaned)) intent = "ADVANTAGES";
+  else if (/\b(?:etapes?|étapes?|phases?|evolution|évolution|deroulement|déroulement|developpement|développement)\b/i.test(cleaned)) intent = "STAGES";
+  else if (/\b(?:mecanisme|mécanisme|fonctionnement|processus)\b/i.test(cleaned)) intent = "MECHANISM";
+  else if (/\b(?:exemples?|illustrations?|cas\s+concrets?|applications?)\b/i.test(cleaned)) intent = "EXAMPLES";
 
   // Retrait des préfixes conversationnels, biographiques et tournures interrogatives
   const topic = cleaned
