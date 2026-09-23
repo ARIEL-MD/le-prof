@@ -4617,7 +4617,7 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
   const normalize = (value: string) => normalizeString(value)
     .replace(/\b(?:donne|donner|donnez|moi|please|svp|stp|merci|cherche|recherche|trouve|trouver|explique|expliquer|parle|parler|sur|pour|de|du|des|d|la|le|les|un|une|au|aux|en|et|ou|avec|dans|ce|cette|ces|qui|est|sont|que|quoi|comment|pourquoi|peut|peuvent|faut|doit|doivent|est-il|est-ce|cours|complet|detaille|fiche|notion|definition|definir|signification|argument|arguments|citation|citations|these|antithese|exemple|exemples|conjugaison|conjuguer|temps|mode|forme|formes)\b/gi, ' ')
     .replace(/\s+/g, ' ').trim();
-  const coreTokens = normalize(rawQuery).split(/\s+/).filter(t => t.length >= 3);
+  const coreTokens = normalize(rawQuery).split(/\s+/).filter(t => t.length >= 3);\n  const exactOnlyTokens = coreTokens.filter(t => /^\\d{3,}$/.test(t));
   if (coreTokens.length === 0) return false;
   const title = normalize(result.chapterTitle || '');
   const resultQuery = normalize(result.query || '');
