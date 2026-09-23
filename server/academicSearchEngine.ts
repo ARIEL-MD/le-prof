@@ -4608,6 +4608,13 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
     return internationalCourse;
   }
 
+  // 6.bis Recherche Encyclopédique Gratuite et Ouverte (Vikidia & Wikipédia - 100% sans IA)
+  const encyclopediaResult = await searchFreeEncyclopedia(rawQuery);
+  if (encyclopediaResult) {
+    saveToCache(cacheKey, encyclopediaResult);
+    return encyclopediaResult;
+  }
+
   // 6.ter Recherche sémantique multi-pistes dans les corpus locaux extensibles.
   const hasSuspiciousIdentifier = /\b\d{6,}\b/.test(normalizeString(rawQuery));
   const semanticFallback = hasSuspiciousIdentifier ? null : await searchLocalSemanticFallback(rawQuery, params.level, params.discipline, params.serie);
@@ -4617,12 +4624,6 @@ async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams)
   if (semanticStrongMatch && semanticCandidateScore(semanticFallback!, rawQuery) >= 12 && isSearchResultRelevant(semanticFallback!, rawQuery)) {
     saveToCache(cacheKey, semanticFallback);
     return semanticFallback;
-  }
-  // 6.bis Recherche Encyclopédique Gratuite et Ouverte (Vikidia & Wikipédia - 100% sans IA)
-  const encyclopediaResult = await searchFreeEncyclopedia(rawQuery);
-  if (encyclopediaResult) {
-    saveToCache(cacheKey, encyclopediaResult);
-    return encyclopediaResult;
   }
 
   // 7. Aucun résultat suffisamment fiable : ne jamais fabriquer une fiche générique.
