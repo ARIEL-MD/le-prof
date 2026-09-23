@@ -1180,6 +1180,26 @@ export function validateAndEnforcePhiloMethodology(
     reconstructedAction: check12Action
   });
 
+  // DERNIER GARDE-FOU : aucune réparation méthodologique ne doit effacer les
+  // termes relationnels du sujet exact, notamment dans la conclusion.
+  const conclusionNorm = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "");
+  const exactAnchors = comp.subjectExact
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[^a-z0-9\\s]/g, " ")
+    .split(/\\s+/)
+    .filter(w => w.length >= 5)
+    .filter(w => !/^(quelle|quelles|quels|comment|pourquoi|peut|peut-on|doit|doit-on|faut|faut-il|dans|mesure|homme|hommes|est|sont|etre)$/i.test(w));
+  const missingAnchors = exactAnchors.filter(w => !conclusionNorm.includes(w));
+  if (missingAnchors.length > 0) {
+    comp.reponseDefinitive = `Toutefois, la réponse à la question « ${comp.subjectExact} » doit rester centrée sur le rapport exact entre les termes du sujet et sur les limites de chaque réponse.`;
+    comp.conclusionFullText = `${comp.bilanSynthese} ${comp.reponseDefinitive} ${comp.elargissement}`.trim();
+  }
+
   const scoreConformite = checks.filter(c => c.status === 'passed').length;
 
   return {
