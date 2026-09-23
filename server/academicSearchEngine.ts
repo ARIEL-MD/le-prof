@@ -4625,13 +4625,13 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
   const body = normalize([result.definitionAndScope || '', result.directContent || '', result.quickRevisionMemo || '', ...(result.coreConceptsAndFormulas || []).slice(0, 20).flatMap(c => [c.name || '', c.formulaOrRule || '', c.explanation || '', c.contextOrApplication || ''])].join(' '));
   const escaped = (token: string) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const has = (text: string, token: string) => new RegExp('\\b' + escaped(token) + '\\b', 'i').test(text);
-  let titleHits = 0, bodyHits = 0, queryHits = 0;
-  for (const token of coreTokens) { if (has(title, token)) titleHits++; if (has(body, token)) bodyHits++; if (has(resultQuery, token)) queryHits++; }
+  let titleHits = 0, bodyHits = 0;
+  for (const token of coreTokens) { if (has(title, token)) titleHits++; if (has(body, token)) bodyHits++; }
   if (coreTokens.every(token => has(title, token))) return true;
-  if (coreTokens.length === 1) return titleHits >= 1 || queryHits >= 1;
-  if (titleHits >= 1 && (bodyHits + queryHits) >= 2) return true;
+  if (coreTokens.length === 1) return titleHits >= 1;
+  if (titleHits >= 1 && bodyHits >= 1) return true;
   if (titleHits >= 2) return true;
-  return (bodyHits + queryHits) >= Math.min(3, coreTokens.length);
+  return bodyHits >= Math.min(3, coreTokens.length);
 }
 
 export async function searchAcademicCourseUnified(params: AcademicSearchParams): Promise<CourseSearchResult> {
