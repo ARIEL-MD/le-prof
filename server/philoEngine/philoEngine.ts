@@ -428,9 +428,16 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
     }
   }
 
-  const matchedNotion = best && best.score > 0 ? best.notion : (
+  let matchedNotion = best && best.score > 0 ? best.notion : (
     matchedRelation ? (philosophieTleKnowledgeBase.notions.find(n => n.name.toLowerCase().includes(matchedRelation.concept1.toLowerCase())) || philosophieTleKnowledgeBase.notions[0]) : philosophieTleKnowledgeBase.notions[0]
   );
+
+  // Les sujets croisés doivent conserver leur relation, même si un seul mot-clé
+  // obtient artificiellement le meilleur score. Priorité aux couples conceptuels.
+  if (/(?:inconscient|inconsciente).*?(?:libert[ée]|libre)|(?:libert[ée]|libre).*?(?:inconscient|inconsciente)/i.test(clean)) {
+    const crossNotion = philosophieTleKnowledgeBase.notions.find(n => n.id === "inconscient-responsabilite");
+    if (crossNotion) matchedNotion = crossNotion;
+  }
 
   // Confiance calculée à partir de l'écart réel entre le 1er et le 2e score,
   // pas une constante recopiée. Un sujet qui ne matche AUCUN mot-clé connu
@@ -1583,7 +1590,7 @@ export function solvePhiloTle(statement: string, options?: PhiloSolveOptions): {
     `Au terme de notre analyse, la question « ${subjectExact} » montre que la première réponse doit être confrontée à ses limites et à ses conditions de validité.`;
 
   const reponseDefinitive =
-    `Ainsi, la réponse à « ${subjectExact} » doit tenir ensemble l'argument initial et l'objection qui le met à l'épreuve, sans remplacer la relation posée par le sujet par une réflexion sur une notion isolée.`;
+    `Toutefois, la réponse à « ${subjectExact} » doit tenir ensemble l'argument initial et l'objection qui le met à l'épreuve, sans remplacer la relation posée par le sujet par une réflexion sur une notion isolée.`;
 
   const elargissement =
     `En définitive, l'enjeu de « ${subjectExact} » est de déterminer les conditions dans lesquelles les termes de la question peuvent être pensés ensemble sans les confondre ni les opposer artificiellement.`;
