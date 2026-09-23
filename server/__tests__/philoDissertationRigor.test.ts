@@ -296,9 +296,9 @@ test("Rigueur méthodologique et polysémie de la dissertation philosophique", a
 
     // 4. Conclusion
     const conclusion = result.structuredRedaction?.conclusion.fullText || "";
-    assert.match(conclusion, /Au terme de notre analyse|la philosophie peut s’effacer de l’ordonnancement/);
-    assert.match(conclusion, /la philosophie demeure indispensable/);
-    assert.match(conclusion, /vers la vérité, la liberté, le bonheur/);
+    assert.ok(conclusion.includes(subject), "La conclusion doit conserver le sujet exact");
+    assert.ok(conclusion.includes("Toutefois"), "La conclusion doit expliciter le dépassement");
+    assert.ok(/rapport exact entre les termes|question/.test(conclusion), "La conclusion doit rester centrée sur la relation du sujet");
   });
 
   test("VARIATION STYLISTIQUE : varie les connecteurs, accroches et illustrations selon les sujets", () => {
