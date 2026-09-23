@@ -191,4 +191,31 @@ describe("Recherche de Cours & Notions — anti faux positifs", () => {
     assert.equal(res.noResult, true);
     assert.match(res.chapterTitle, /aucun résultat pertinent/i);
   });
+  it("répond exactement à une demande de conjugaison ciblée et conserve le verbe demandé", async () => {
+    const res = await searchAcademicCourseUnified({ query: "manger au présent" });
+    assert.equal(res.noResult, undefined);
+    assert.match(res.chapterTitle, /manger/i);
+    assert.match(res.directContent || "", /TEMPS DEMANDÉ.*PRÉSENT/i);
+    assert.match(res.directContent || "", /je\\s+\*?mange/i);
+  });
+
+  it("retourne le corpus demandé pour 'argument sur la liberté' sans basculer vers une autre notion", async () => {
+    const res = await searchAcademicCourseUnified({ query: "argument sur la liberté" });
+    assert.equal(res.noResult, undefined);
+    assert.match(res.chapterTitle, /liberté/i);
+    assert.ok(res.coreConceptsAndFormulas.length >= 2);
+    assert.ok(res.coreConceptsAndFormulas.some(c => /citation|auteur|libert/i.test(c.name + " " + c.formulaOrRule + " " + c.explanation)));
+  });
+
+  it("refuse une fiche sans rapport même lorsqu'un mot générique pourrait déclencher une base voisine", async () => {
+    const res = await searchAcademicCourseUnified({ query: "xyzqv notion 847291" });
+    assert.equal(res.noResult, true);
+    assert.match(res.chapterTitle, /aucun résultat pertinent/i);
+  });
+
+  it("ne confond pas une requête à plusieurs termes avec une fiche partageant seulement un mot générique", async () => {
+    const res = await searchAcademicCourseUnified({ query: "agriculture lunaire quantique 847291" });
+    assert.equal(res.noResult, true);
+  });
+
 });
