@@ -4104,7 +4104,7 @@ PRINCIPES Son action repose sur :
   return undefined;
 }
 
-export async function searchAcademicCourseUnified(params: AcademicSearchParams): Promise<CourseSearchResult> {
+async function searchAcademicCourseUnifiedInternal(params: AcademicSearchParams): Promise<CourseSearchResult> {
   const rawQuery = (params.query || "").trim();
   const cleanQuery = normalizeString(rawQuery);
   
