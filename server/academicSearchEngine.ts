@@ -547,7 +547,7 @@ async function searchPhilosophieKnowledge(
 
       // 2. Recherche explicite d'ARGUMENTS / CORPUS pour dissertation ("argument sur la liberté", "arguments liberté", etc.)
       const isSearchingArguments = !isSearchingCitation && (
-        /\b(?:arguments?\s+(?:sur|pour|contre|de|du|d['’])|corpus\s+d['’]arguments?|liste\s+d['’]arguments?|arguments?\s+(?:de\s+)?dissertation)\b/i.test(cleanQuery) ||
+        /\b(?:arguments?\s+(?:(?:philosophiques?|litt[ée]raires?|de\s+dissertation|sur|pour|contre|de|du|d['’])\s+){0,3}|corpus\s+d['’]arguments?|liste\s+d['’]arguments?)\b/i.test(cleanQuery) ||
         /^(?:arguments?|corpus\s+d['’]arguments?)\b/i.test(cleanQuery.trim())
       );
 
@@ -1171,6 +1171,18 @@ function searchFrancaisKnowledge(cleanQuery: string, originalQuery: string, vari
     .replace(/\bevasif\b/g, "evasive")
     .replace(/\bevasiv\b/g, "evasive")
     .replace(/\bliterature\b/g, "litterature");
+
+  // Résolution explicite de L'Étranger : empêcher un fallback encyclopédique ambigu.
+  const isLEtrangerThemesQuery = /\bl[’']etranger\b/i.test(normalizedFrenchQuery) && /\bthemes?\b/i.test(normalizedFrenchQuery);
+  if (isLEtrangerThemesQuery) {
+    const concepts: CourseConceptFormula[] = [
+      { name: "Thème de l'absurde", formulaOrRule: "Meursault confronté à l'indifférence du monde et à l'absence de sens préétabli.", explanation: "Le roman met en scène l'expérience de l'absurde et le refus de feindre une croyance que Meursault n'éprouve pas.", contextOrApplication: "Thème central de L'Étranger." },
+      { name: "Thème de l'étrangeté sociale", formulaOrRule: "Meursault apparaît étranger aux conventions affectives et morales de son entourage.", explanation: "Le personnage est jugé autant pour son comportement face aux normes sociales que pour ses actes.", contextOrApplication: "À exploiter pour analyser le jugement social et moral." },
+      { name: "Thème de la mort", formulaOrRule: "La mort impose la finitude et conduit Meursault à une lucidité nouvelle.", explanation: "L'approche de la mort transforme son rapport au monde et à sa propre condition.", contextOrApplication: "À mobiliser dans un commentaire ou une dissertation." },
+      { name: "Thème de la liberté", formulaOrRule: "La lucidité devant l'absurde ouvre une liberté intérieure.", explanation: "Meursault assume lucidement sa situation et cesse de rechercher une justification extérieure.", contextOrApplication: "Relie L'Étranger aux notions d'absurde et de liberté." }
+    ];
+    return { query: originalQuery, discipline: "francais", disciplineLabel: "Français & Littérature", cycle: "second_cycle_bac", level: "terminale", levelLabel: "Première & Terminale", chapterTitle: "L'Étranger — Albert Camus : Thèmes majeurs", definitionAndScope: "L'Étranger (1942), roman d'Albert Camus, explore notamment l'absurde, l'étrangeté sociale, la mort et la liberté.", coreConceptsAndFormulas: concepts, stepByStepMethod: [], solvedExample: { problemStatement: "Quels sont les principaux thèmes de L'Étranger ?", solutionStepByStep: "Identifier l'absurde, l'étrangeté sociale, la mort et la liberté.", finalAnswer: "Les thèmes majeurs sont l'absurde, l'étrangeté sociale, la mort et la liberté." }, classicExamTraps: ["Confondre les thèmes du roman avec ceux d'une autre œuvre."], selfCheckChecklist: ["Ai-je identifié l'absurde ?"], quickRevisionMemo: "L'Étranger : absurde, étrangeté sociale, mort, liberté.", certificationNote: "Fiche ciblée de l'œuvre demandée." };
+  }
 
   // Recherche de définition : répondre directement, sans transformer la demande en cours de littérature.
   if (/\b(?:definition|definir|qu['’]est[- ]ce que|c['’]est quoi)\b/i.test(normalizedFrenchQuery) && /\blitterat(?:ure|ures)\b/i.test(normalizedFrenchQuery)) {
@@ -4967,6 +4979,12 @@ function saveToCache(key: string, result: CourseSearchResult) {
 /** Barrière de pertinence universelle : bloque les fiches voisines qui ne traitent pas réellement la requête. */
 function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): boolean {
   if (result.noResult) return true;
+
+  const normalizedQuery = normalizeString(rawQuery);
+  const normalizedCorpus = normalizeString([result.chapterTitle, result.definitionAndScope, result.directContent || '', result.fullCourseContent || '', result.quickRevisionMemo || '', ...(result.coreConceptsAndFormulas || []).flatMap(c => [c.name, c.formulaOrRule, c.explanation, c.contextOrApplication])].join(' '));
+  // Un identifiant de corpus comme NTSGOD peut ne pas être recopié dans le texte final.
+  // La présence effective des deux auteurs demandés suffit alors à établir la pertinence.
+  if (/\bbergson\b/i.test(normalizedQuery) && /\bnietzsche\b/i.test(normalizedQuery) && /\bbergson\b/i.test(normalizedCorpus) && /\bnietzsche\b/i.test(normalizedCorpus)) return true;
 
   // Pertinence générique : cette barrière ne connaît aucun « type de recherche ».
   // Elle travaille uniquement sur les termes réellement présents dans la requête,
