@@ -55,6 +55,7 @@ import { getVariedArgumentCorpus, identifyArgumentTopic, ALL_ARGUMENT_VARIANTS }
 import { searchInternationalAcademicCourse, isInternationalQuery } from "./internationalCourseEngine";
 import { conjugateVerb, detectVerbLanguage, parseConjugationRequest } from "../src/utils/conjugator/universalConjugator";
 import { ensureNumberedTitlesBold } from "../src/utils/textFormatter";
+import { textContainsResemblingToken } from "../src/utils/fuzzyMatch";
 
 // Cache mémoire des recherches de cours (LRU simple)
 const searchCache = new Map<string, CourseSearchResult>();
@@ -4994,11 +4995,9 @@ function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): b
   ].join(' '));
 
   const has = (text: string, token: string) => {
-    if (text.includes(token)) return true;
-    // Tolérance légère aux variantes morphologiques : elle ne crée aucune
-    // connaissance prédéfinie, elle rapproche seulement des formes lexicales.
-    const stem = token.length >= 6 ? token.slice(0, -1) : token;
-    return stem.length >= 4 && text.split(/\s+/).some(word => word.startsWith(stem));
+    // Reconnaissance générique (racine morphologique + tolérance aux fautes de frappe) :
+    // reconnaît une formulation jamais vue auparavant sans dépendre d'un lexique figé.
+    return textContainsResemblingToken(text, token);
   };
 
   const phraseParts = q.split(/\s+/).filter(t => t.length >= 3 && !grammaticalStopWords.has(t));

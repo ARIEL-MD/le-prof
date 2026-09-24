@@ -1,4 +1,5 @@
 import { DisciplineType, EducationCycle, SecondaryLevel, CourseConceptFormula, CourseMethodStep, CourseSolvedExample } from '../types';
+import { stripAccentsLower, textContainsResemblingToken } from '../utils/fuzzyMatch';
 
 export interface AcademicTopicKnowledge {
   id: string;
@@ -1973,6 +1974,35 @@ export function findAcademicKnowledge(query: string, disciplineHint?: string): A
   if (/allemand|deutsch|klima|umwelt|workcamp|konditionalsatz/i.test(q) || disc === 'allemand') {
     const t = ACADEMIC_KNOWLEDGE_BASE.find(t => t.id === 'allemand-tle-lecon1-mitmachen');
     if (t) return t;
+  }
+
+  // 3. Recherche générique de secours : aucune des expressions régulières ci-dessus n'a
+  // reconnu la requête (formulation nouvelle jamais vue). On compare alors la requête,
+  // au sens large (racine des mots + tolérance aux fautes de frappe), au titre et aux
+  // mots-clés attendus de chaque fiche, sans dépendre d'un lexique pré-enregistré.
+  const STOP = new Set(['cours','cour','sur','les','des','pour','dans','une','avec','tout','tous','par','son','ses','qui','que','est','sont','donne','moi','cherche','trouve','chapitre','lecon','fiche','resume','definition','definir','signification','notion','concept','explication','quelles','quels','quelle','quel','comment','complet','detaille']);
+  const qTokens = stripAccentsLower(q).split(/[^a-z0-9]+/).filter(t => t.length >= 3 && !STOP.has(t));
+  if (qTokens.length > 0) {
+    let best: AcademicTopicKnowledge | null = null;
+    let bestScore = 0;
+    for (const topic of ACADEMIC_KNOWLEDGE_BASE) {
+      const searchable = [topic.chapterTitle, ...(topic.expectedKeywords || []), topic.definitionAndScope].join(' ');
+      let matched = 0;
+      let titleHit = false;
+      for (const token of qTokens) {
+        if (textContainsResemblingToken(searchable, token)) {
+          matched++;
+          if (textContainsResemblingToken(topic.chapterTitle, token)) titleHit = true;
+        }
+      }
+      const coverage = matched / qTokens.length;
+      const score = matched * 10 + (titleHit ? 25 : 0);
+      if (coverage >= 0.6 && score > bestScore) {
+        bestScore = score;
+        best = topic;
+      }
+    }
+    if (best) return best;
   }
 
   return null;

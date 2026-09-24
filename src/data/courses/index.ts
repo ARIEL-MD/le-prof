@@ -1,4 +1,5 @@
 import { OfficialIvorianCourse, DisciplineType, SecondaryLevel, AcademicSerie } from '../../types';
+import { textContainsResemblingToken } from '../../utils/fuzzyMatch';
 import { COLLEGE_6E_PHYSIQUE_COURSES } from './college6ePhysiqueCourses';
 import { COLLEGE_6E_CHIMIE_COURSES } from './college6eChimieCourses';
 import { COLLEGE_6E_HISTOIRE_COURSES } from './college6eHistoireCourses';
@@ -229,6 +230,11 @@ export function findOfficialCourse(
       // Inverse : la requête entière forme-t-elle un mot complet du mot-clé ?
       const reverseContained = new RegExp(`\\b${escapeRegExp(normalizedQuery)}\\b`, 'i').test(kwLower) && normalizedQuery.length >= 3;
 
+      // Reconnaissance générique : le mot-clé (ou l'un de ses mots) ressemble-t-il à
+      // un mot de la requête (racine commune / faute de frappe), sans correspondance exacte ?
+      const fuzzyMatch = !exactOrContained && !reverseContained && kwLower.length >= 4 &&
+        textContainsResemblingToken(normalizedQuery, kwLower);
+
       if (exactOrContained) {
         if (isGeneric) {
           score += 2;
@@ -243,6 +249,13 @@ export function findOfficialCourse(
           score += 20;
           hasSpecificSignal = true;
         }
+      } else if (fuzzyMatch) {
+        if (isGeneric) {
+          score += 1;
+        } else {
+          score += 14;
+          hasSpecificSignal = true;
+        }
       }
     }
 
@@ -253,18 +266,44 @@ export function findOfficialCourse(
     for (const token of queryTokens) {
       if (token.length < 2) continue;
       const tokenRegex = new RegExp(`\\b${escapeRegExp(token)}\\b`, 'i');
-      if (tokenRegex.test(searchableText)) {
+      const exactHitBody = tokenRegex.test(searchableText);
+      // Reconnaissance générique (racine morphologique / tolérance aux fautes de frappe) :
+      // permet de reconnaître une formulation JAMAIS vue auparavant (pluriel, conjugaison,
+      // faute de frappe...) sans qu'aucune liste de synonymes n'ait été pré-enregistrée.
+      // Note : ce signal flou n'alimente PAS le compteur de couverture (matchedTokensCount),
+      // car un mot très courant (ex: "fonctionne" ≈ "fonctionnement") apparaît dans presque
+      // toute fiche et ne doit jamais, à lui seul, déclencher le bonus de couverture réservé
+      // aux correspondances franches.
+      const fuzzyHitBody = !exactHitBody && token.length >= 4 && textContainsResemblingToken(searchableText, token);
+      if (exactHitBody) {
         score += isMultiTopicIndex ? 2 : 8;
         matchedTokensCount++;
+      } else if (fuzzyHitBody) {
+        score += isMultiTopicIndex ? 1 : 4;
       }
       // Bonus si le mot-clé ou le titre contient directement ce terme significatif en tant que mot entier
-      if (tokenRegex.test(normalizedCourseLesson) || tokenRegex.test(normalizedCourseChapter)) {
+      const exactHitTitle = tokenRegex.test(normalizedCourseLesson) || tokenRegex.test(normalizedCourseChapter);
+      const fuzzyHitTitle = !exactHitTitle && token.length >= 4 &&
+        (textContainsResemblingToken(normalizedCourseLesson, token) || textContainsResemblingToken(normalizedCourseChapter, token));
+      if (exactHitTitle) {
         if (isMultiTopicIndex) {
           score += 2;
         } else {
           score += 15;
           hasSpecificSignal = true;
         }
+        if (!exactHitBody) matchedTokensCount++;
+      } else if (fuzzyHitTitle) {
+        // Une ressemblance dans le TITRE reste un signal fort (contrairement au corps du
+        // texte, bien plus long et donc plus sujet aux coïncidences) : elle compte pour
+        // la couverture, avec un bonus toutefois inférieur à une correspondance exacte.
+        if (isMultiTopicIndex) {
+          score += 1;
+        } else {
+          score += 10;
+          hasSpecificSignal = true;
+        }
+        matchedTokensCount++;
       }
     }
 
