@@ -460,7 +460,7 @@ ${searchResult.stepByStepMethod && searchResult.stepByStepMethod.length > 0 ? `M
                   <span>Recherche de Cours & Notions</span>
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5">
-                  Recherche instantanée et universelle : arguments de dissertation rédigés, citations philosophiques d'auteurs, œuvres littéraires clés, théorèmes mathématiques et cours officiels complets.
+                  Recherche libre et universelle pour les élèves de la 6e à la Terminale, toutes séries et toutes matières, en Côte d’Ivoire et à l’international : cours, notions, définitions, explications, méthodes, formules, exercices, histoire, géographie, sciences, mathématiques, français, philosophie, langues et bien plus.
                 </p>
               </div>
             </div>
