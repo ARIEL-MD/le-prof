@@ -185,7 +185,9 @@ function findStrictOfficialCourseForQuery(
     }
     return !intentWords.has(t);
   });
-  if (!subjectTokens.length) return null;
+  if (!subjectTokens.length) {
+    return null;
+  }
 
   const subject = subjectTokens.join(' ');
   const synonyms: string[] = [];
@@ -217,7 +219,9 @@ function findStrictOfficialCourseForQuery(
   const exactPhrase = courseText.includes(normSubject);
   const exactKeyword = (result.keywords || []).some(k => normalizeString(k).normalize('NFD').replace(/[\u0300-\u036f]/g, '') === normSubject);
 
-  if (!exactPhrase && !exactKeyword && coverage < 0.50 && covered < 1) return null;
+  if (!exactPhrase && !exactKeyword && coverage < 0.50 && covered < 1) {
+    return null;
+  }
   return result;
 }
 

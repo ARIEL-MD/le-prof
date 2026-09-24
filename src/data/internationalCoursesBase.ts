@@ -531,7 +531,12 @@ III. MACHINES THERMIQUES ET CYCLE DE CARNOT :
   // =========================================================================
   {
     id: 'geopolitique-mondialisation-institutions-internationales',
-    queryKeywords: /\b(?:mondialisation|globalisation|gouvernance\s*mondiale|institutions?\s*internationales?|fmi|banque\s*mondiale|omc|triade|brics|onu|relations\s*internationales)\b/i,
+    // Note : "onu" retiré du déclenchement immédiat (queryKeywords) — un cours dédié et plus
+    // précis existe pour l'ONU dans le référentiel officiel ivoirien (BEPC/BAC), qui doit
+    // toujours être trouvé en priorité pour une requête sur l'ONU. "onu" reste dans les
+    // mots-clés de scoring ci-dessous pour continuer à valoriser cette fiche quand la requête
+    // porte véritablement sur la mondialisation/gouvernance mondiale et mentionne l'ONU au passage.
+    queryKeywords: /\b(?:mondialisation|globalisation|gouvernance\s*mondiale|institutions?\s*internationales?|fmi|banque\s*mondiale|omc|triade|brics|relations\s*internationales)\b/i,
     keywords: ['mondialisation', 'gouvernance mondiale', 'fmi', 'banque mondiale', 'omc', 'onu', 'triade', 'brics', 'géopolitique', 'relations internationales', 'multilatéralisme', 'droit international'],
     discipline: 'geographie',
     disciplineLabel: 'Géopolitique & Relations Internationales (Supérieur & Bac)',
@@ -661,7 +666,7 @@ export function findInternationalCourse(query: string): CourseSearchResult | nul
     }
   }
 
-  if (bestMatch && maxScore > 0) {
+  if (bestMatch && maxScore >= 20) {
     return {
       query: qClean,
       discipline: bestMatch.discipline,
