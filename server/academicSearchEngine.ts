@@ -4962,25 +4962,77 @@ function saveToCache(key: string, result: CourseSearchResult) {
 /** Barrière de pertinence universelle : bloque les fiches voisines qui ne traitent pas réellement la requête. */
 function isSearchResultRelevant(result: CourseSearchResult, rawQuery: string): boolean {
   if (result.noResult) return true;
-  const normalize = (value: string) => normalizeString(value)
-    .replace(/\b(?:donne|donner|donnez|moi|please|svp|stp|merci|cherche|recherche|trouve|trouver|explique|expliquer|parle|parler|sur|pour|de|du|des|d|la|le|les|un|une|au|aux|en|et|ou|avec|dans|ce|cette|ces|qui|est|sont|que|quoi|comment|pourquoi|peut|peuvent|faut|doit|doivent|est-il|est-ce|cours|complet|detaille|fiche|notion|definition|definir|signification|argument|arguments|citation|citations|these|antithese|exemple|exemples|conjugaison|conjuguer|temps|mode|forme|formes)\b/gi, ' ')
-    .replace(/\s+/g, ' ').trim();
-  const coreTokens = normalize(rawQuery).split(/\s+/).filter(t => t.length >= 3);
-  const exactOnlyTokens = coreTokens.filter(t => /^\d{3,}$/.test(t));
-  if (coreTokens.length === 0) return false;
+
+  // Pertinence générique : cette barrière ne connaît aucun « type de recherche ».
+  // Elle travaille uniquement sur les termes réellement présents dans la requête,
+  // leur couverture dans le titre/contenu et les expressions multi-mots.
+  const normalize = (value: string) => normalizeString(value);
+  const q = normalize(rawQuery);
+  if (!q) return false;
+
+  const grammaticalStopWords = new Set([
+    'a','au','aux','avec','ce','ceci','cela','ces','cette','dans','de','des','du',
+    'en','et','est','ete','etait','etre','il','ils','je','la','le','les','leur',
+    'leurs','ma','mais','me','mes','mon','ne','nos','notre','nous','on','ou','par',
+    'pas','pour','que','quel','quelle','quelles','quels','qui','quoi','sa','se',
+    'ses','son','sur','ta','te','tes','toi','ton','tous','tout','un','une','vos',
+    'votre','vous','y','d','l','moi','svp','stp','merci'
+  ]);
+
+  const queryTokens = q.split(/\s+/).filter(t => t.length >= 3 && !grammaticalStopWords.has(t));
+  if (!queryTokens.length) return false;
+
   const title = normalize(result.chapterTitle || '');
-  const resultQuery = normalize(result.query || '');
-  const body = normalize([result.definitionAndScope || '', result.directContent || '', result.quickRevisionMemo || '', ...(result.coreConceptsAndFormulas || []).slice(0, 20).flatMap(c => [c.name || '', c.formulaOrRule || '', c.explanation || '', c.contextOrApplication || ''])].join(' '));
-  const escaped = (token: string) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const has = (text: string, token: string) => new RegExp('\\b' + escaped(token) + '\\b', 'i').test(text);
-  let titleHits = 0, bodyHits = 0;
-  for (const token of coreTokens) { if (has(title, token)) titleHits++; if (has(body, token)) bodyHits++; }
-  if (exactOnlyTokens.some(token => !has(title, token))) return false;
-  if (coreTokens.every(token => has(title, token))) return true;
-  if (coreTokens.length === 1) return titleHits >= 1;
-  if (titleHits >= 1 && bodyHits >= 1) return true;
-  if (titleHits >= 2) return true;
-  return bodyHits >= Math.min(3, coreTokens.length);
+  const body = normalize([
+    result.definitionAndScope || '',
+    result.directContent || '',
+    result.fullCourseContent || '',
+    result.quickRevisionMemo || '',
+    ...(result.coreConceptsAndFormulas || []).slice(0, 30).flatMap(c => [
+      c.name || '', c.formulaOrRule || '', c.explanation || '', c.contextOrApplication || ''
+    ])
+  ].join(' '));
+
+  const has = (text: string, token: string) => {
+    if (text.includes(token)) return true;
+    // Tolérance légère aux variantes morphologiques : elle ne crée aucune
+    // connaissance prédéfinie, elle rapproche seulement des formes lexicales.
+    const stem = token.length >= 6 ? token.slice(0, -1) : token;
+    return stem.length >= 4 && text.split(/\s+/).some(word => word.startsWith(stem));
+  };
+
+  const phraseParts = q.split(/\s+/).filter(t => t.length >= 3 && !grammaticalStopWords.has(t));
+  const meaningfulPhrase = phraseParts.join(' ');
+  const exactPhraseInTitle = meaningfulPhrase.length >= 8 && title.includes(meaningfulPhrase);
+  const exactPhraseInBody = meaningfulPhrase.length >= 8 && body.includes(meaningfulPhrase);
+
+  let weightedTotal = 0;
+  let weightedTitle = 0;
+  let weightedBody = 0;
+
+  for (const token of queryTokens) {
+    // Les termes longs portent davantage d'information que les mots très courts.
+    const weight = token.length >= 9 ? 3 : token.length >= 6 ? 2 : 1;
+    weightedTotal += weight;
+    if (has(title, token)) weightedTitle += weight;
+    if (has(body, token)) weightedBody += weight;
+  }
+
+  // Une expression complète correspondant au résultat est une preuve forte.
+  if (exactPhraseInTitle || exactPhraseInBody) return true;
+
+  const coverage = (weightedTitle + weightedBody) / Math.max(weightedTotal * 2, 1);
+  const bodyCoverage = weightedBody / Math.max(weightedTotal, 1);
+
+  // Pour une recherche composée, exiger plusieurs concepts concordants.
+  // Un résultat qui ne partage qu'un seul mot avec la question est donc rejeté.
+  if (queryTokens.length >= 4) {
+    return weightedTitle >= 3 || bodyCoverage >= 0.62 || coverage >= 0.58;
+  }
+  if (queryTokens.length === 3) {
+    return weightedTitle >= 2 || bodyCoverage >= 0.67 || coverage >= 0.62;
+  }
+  return weightedTitle >= 1 || bodyCoverage >= 0.75;
 }
 
 function buildSemanticSearchVariants(rawQuery: string): string[] {
